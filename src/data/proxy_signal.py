@@ -45,6 +45,26 @@ def fetch_spx_history(start: str, end: str) -> pd.Series:
     return series
 
 
+def fetch_risk_free_rate_history(start: str, end: str) -> pd.Series:
+    """Fetch daily 13-week T-bill yield (^IRX) as a risk-free rate proxy.
+
+    Used by src/backtest/pricing.py's Black-Scholes proxy pricing. ^IRX
+    is quoted in percentage points (e.g. 5.25 meaning 5.25%); this
+    returns it converted to decimal (0.0525) to match the rate convention
+    every pricing formula expects.
+    """
+    data = yf.download("^IRX", start=start, end=end, progress=False, auto_adjust=False)
+    if data.empty:
+        raise ValueError(f"No ^IRX data returned for {start}..{end}")
+    series = data["Close"]
+    if isinstance(series, pd.DataFrame):
+        series = series.iloc[:, 0]
+    series = series.copy() / 100.0
+    series.index = series.index.tz_localize(None)
+    series.name = "risk_free_rate"
+    return series
+
+
 def compute_realized_volatility(prices: pd.Series, window_days: int = 21) -> pd.Series:
     """Rolling annualized realized volatility from a price series.
 

@@ -22,11 +22,24 @@ risk:
   starting_capital_usd: 1000         # placeholder, confirm together
   kelly_fraction: 0.5                # half-Kelly; never 1.0
 
+# Phase 3 proxy backtest: we don't have real historical SPX options chain
+# data yet (docs/project_spec.md section 6), so trade legs are priced with
+# Black-Scholes off VIX as a flat implied vol. Confirmed together 2026-08-02;
+# revisit once a real chain data provider is chosen. See src/backtest/pricing.py
+# for the caveats this introduces (no skew, no dividend yield).
+pricing_proxy:
+  method: black_scholes_flat_vix
+  risk_free_rate_source: yfinance_IRX   # 13-week T-bill (^IRX), pulled historically
+  dte_trading_days: 21                  # approximates the monthly cycle; not actual 3rd-Friday expirations
+  contract_multiplier: 100              # standard SPX option multiplier
+
 backtest:
   split_regimes: true                # report pre-2010 and post-2010 separately
   regime_split_year: 2010
   model_transaction_costs: true
   model_bid_ask_slippage: true
+  cost_per_contract_usd: 0.65        # exchange/regulatory fees; Alpaca itself is commission-free
+  slippage_pct_of_credit: 0.10       # haircut on net credit to proxy 4-leg bid-ask slippage
 
 paper_trading:
   min_expiration_cycles: 1           # TODO confirm
