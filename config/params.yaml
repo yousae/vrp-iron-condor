@@ -1,0 +1,39 @@
+# Central config for the VRP iron condor project.
+# Cross-reference: docs/project_spec.md sections 3, 5, and 9.
+# Anything marked TODO must be decided together before Phase 2 work
+# gets built out against it.
+
+signal:
+  iv_rank_lookback_days: 252
+  iv_rank_thresholds_to_test: [50, 70, 80]  # sweep, don't hand-pick after seeing results
+
+structure:
+  underlying: SPX
+  short_delta: 0.20
+  long_delta: 0.05
+  cycle: monthly
+
+exit:
+  version: v1_hold_to_expiration   # switch to "v2_close_at_50pct_max_profit" once v1 is validated
+
+risk:
+  max_risk_per_trade_pct: 0.02
+  portfolio_heat_cap_pct: null       # TODO
+  starting_capital_usd: 1000         # placeholder, confirm together
+  kelly_fraction: 0.5                # half-Kelly; never 1.0
+
+backtest:
+  split_regimes: true                # report pre-2010 and post-2010 separately
+  regime_split_year: 2010
+  model_transaction_costs: true
+  model_bid_ask_slippage: true
+
+paper_trading:
+  min_expiration_cycles: 1           # TODO confirm
+  min_trades: null                   # TODO confirm
+  go_live_requires_beat_benchmarks: [SPY, CNDR]
+  go_live_requires_metrics: [sharpe, sortino]
+
+benchmarks:
+  - SPY
+  - CNDR

@@ -1,0 +1,21 @@
+# Environments and secrets
+.env
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# Data and logs (don't commit raw market data or trade logs)
+data/raw/
+logs/*.log
+
+# Notebooks
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
