@@ -39,8 +39,8 @@ tests/             unit tests
 
 ## Contributors
 
-- Yousif — quant/engineering (signal, backtest, execution)
-- [Friend] — market thesis review, trade construction sanity checks, write-up narrative
+- Yousif — engineering (signal, backtest, execution)
+- Carter — market thesis review, trade construction sanity checks, write-up narrative
 
 ## Status
 
