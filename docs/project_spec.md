@@ -79,11 +79,48 @@ Every result gets compared against:
 
 ## 9. Go/no-go criteria (pre-registered before paper trading starts)
 
-Decide this now, before seeing any paper-trading results, so the eventual decision can't be quietly rationalized after the fact:
+Decide this now, before seeing any paper-trading results, so the eventual decision can't be quietly rationalized after the fact.
 
-- Paper trade for **[TBD: one full expiration cycle minimum, or N trades — confirm together]**.
-- Advance to live capital only if the paper-traded results beat both SPY and CNDR on Sharpe **and** Sortino ratio over that window.
-- If results are inconclusive or worse than benchmarks: that is a legitimate, reportable finding. The write-up does not require a live-trading phase to be a strong project — an honest null result, properly explained, is more credible than a forced live phase.
+### 9.1 Why the original criterion was replaced (finalized 2026-08-03)
+
+The draft criterion was *"advance to live capital only if paper results beat both SPY and CNDR on Sharpe **and** Sortino."* Once the backtest was built, we measured the strategy's actual trade frequency and found that criterion is **not reachable at any realistic paper-trading duration**. Recording the arithmetic here, because the decision to change a pre-registered criterion is exactly the kind of thing that has to be justified in the open rather than quietly edited:
+
+| Threshold | Trades/yr (post-2010) | Months to 10 trades | Months to 30 trades |
+|---|---|---|---|
+| IV rank > 50 | 3.22 | 37 | 112 |
+| IV rank > 70 | 1.61 | 75 | 224 |
+| IV rank > 80 | 1.21 | 99 | 298 |
+
+Three independent statistics all point the same direction:
+
+- **Minimum backtest length.** Justifying our 3 pre-registered threshold variants requires ~4.2 years of data at the best observed Sharpe (0.72), and ~8.8 years at a more typical 0.5.
+- **Trials the sample can support.** One year of paper trading statistically supports ~1.3 trials. We are testing 3.
+- **Power.** Using Lo (2002), the standard error of a Sharpe estimate is `SE ≈ √((1 + SR²/2) / n)`. At 30 trades, a per-trade Sharpe of 0.20 carries a 95% CI of **[−0.16, +0.56]** — it still contains zero. Roughly 100 trades are needed before the interval excludes zero, which is **~62 years** at the >70 trade rate.
+
+A gate that cannot be satisfied is worse than no gate: it guarantees the eventual decision gets made on unstated grounds. So the paper phase is reframed from a *statistical* test to an *operational* one. **This does not lower the bar for claiming an edge — it removes a claim we were never going to be able to make, and says so.**
+
+### 9.2 The criteria
+
+**Sample required before any go/no-go decision:** at least **5 trades** and at least **6 expiration cycles** (whichever comes later; ~19 months expected).
+
+Paper trade the **loosest threshold (>50) only**, tagging each trade with its entry IV rank. The thresholds are nested — every >80 trade is also a >70 and a >50 — so a single stream evaluates all three variants at 3x the data rate of running three separate books.
+
+**What the paper phase actually tests (all must pass):**
+
+1. **Execution works end-to-end.** 4-leg orders submit, fill, and settle without manual intervention.
+2. **Fills match the model.** Median realized slippage stays within the modeled 10% haircut on net credit.
+3. **Signal fidelity.** The live signal fires on the dates the backtest says it would, given the same data.
+4. **Sim-to-live reconciliation.** Each closed trade's realized P&L matches what the pricing model predicts given the actual settlement price. *(This is the step most often skipped; persistent divergence means the simulator is wrong, which would make every backtest run through it suspect.)*
+
+**Disqualifying conditions — any one of these stops the live phase regardless of P&L:**
+
+- Median realized slippage exceeds **20% of gross credit** (2x the modeled assumption). This would materially invalidate the backtest's cost model, not just reduce returns.
+- The live signal diverges from what the backtest would have generated.
+- Settlement or P&L reconciliation fails.
+
+**On benchmarks:** SPY and CNDR comparisons are still computed and **reported** in the write-up for context. They are no longer a pass/fail gate, because the sample cannot support the comparison. The write-up must state this limitation directly rather than presenting an underpowered comparison as if it were evidence.
+
+**If the operational criteria fail, or the results are inconclusive:** that is a legitimate, reportable finding. The write-up does not require a live-trading phase to be a strong project — an honest null result, properly explained, is more credible than a forced live phase.
 
 ## 10. Roles
 
@@ -123,11 +160,17 @@ Decide this now, before seeing any paper-trading results, so the eventual decisi
 
 ---
 
-## Open parameters to finalize together before Phase 2
+## Open parameters — all resolved as of 2026-08-03
 
-- [ ] IV rank lookback window (default: 252 days)
-- [ ] IV rank entry threshold(s) to test (default: sweep 50 / 70 / 80)
-- [ ] Max risk per trade (default: 2% of capital)
-- [ ] Portfolio heat cap (total concurrent risk)
-- [ ] Starting capital amount
-- [ ] Paper-trading duration/trade-count before go/no-go decision
+- [x] IV rank lookback window — **252 days**
+- [x] IV rank entry threshold(s) to test — **sweep 50 / 70 / 80**, pre-registered, reported in full
+- [x] Max risk per trade — **2% of capital**
+- [x] Portfolio heat cap (total concurrent risk) — **6%** (~3x the per-trade cap)
+- [x] Starting capital amount — **$1,000** (small enough that a full max-loss month doesn't hurt either of us)
+- [x] Paper-trading duration/trade-count before go/no-go — **5 trades and 6 cycles minimum**, against operational criteria rather than a Sharpe comparison (see §9)
+
+Parameters added after the spec's first draft, as the build surfaced the need for them:
+
+- [x] Proxy pricing method — Black-Scholes off flat VIX, `^IRX` risk-free rate, 21-trading-day DTE (see §6; no real chain data yet)
+- [x] Transaction costs — **$0.65/contract** (4 legs) + **10%** haircut on net credit for bid-ask slippage
+- [x] Kelly multiplier — **0.5** (half-Kelly ceiling, enforced in code in `src/risk/sizing.py`)

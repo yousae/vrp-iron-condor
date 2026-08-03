@@ -44,11 +44,34 @@ backtest:
   cost_per_contract_usd: 0.65        # exchange/regulatory fees; Alpaca itself is commission-free
   slippage_pct_of_credit: 0.10       # haircut on net credit to proxy 4-leg bid-ask slippage
 
+# Reframed from a statistical test to an operational one, 2026-08-03.
+# Why: at the measured post-2010 trade frequency (3.22/yr at threshold >50,
+# 1.61/yr at >70, 1.21/yr at >80), a "beat SPY and CNDR on Sharpe" gate could
+# never be honestly satisfied -- ~100 trades are needed before a 95% CI on the
+# Sharpe excludes zero, which is ~62 years at the >70 rate. Keeping an
+# unreachable gate invites rationalizing past it, which is the exact failure
+# pre-registration exists to prevent. Full derivation in project_spec.md s9.
 paper_trading:
-  min_expiration_cycles: 1           # TODO confirm
-  min_trades: null                   # TODO confirm
-  go_live_requires_beat_benchmarks: [SPY, CNDR]
-  go_live_requires_metrics: [sharpe, sortino]
+  min_expiration_cycles: 6
+  min_trades: 5
+  # Paper trade the LOOSEST threshold only. The thresholds are nested (every
+  # >80 trade is also a >70 and a >50), so tagging each trade with its entry
+  # IV rank lets one stream evaluate all three variants -- 3x the data rate
+  # of running three separate books, at no cost.
+  paper_stream_threshold: 50
+
+  # Go-live gate is operational, not statistical: does the execution path work?
+  go_live_requires: operational_validation
+  # ANY of these kills the live phase regardless of P&L.
+  disqualifying_conditions:
+    median_slippage_pct_of_credit_above: 0.20   # 2x the modeled 0.10 assumption
+    signal_diverged_from_backtest: true         # live signal must fire when the backtest says it would
+    settlement_reconciliation_failed: true      # realized P&L must match model given actual settlement
+
+  # Benchmarks are still REPORTED for context in the write-up -- they are just
+  # no longer a pass/fail gate, since the sample can't support the comparison.
+  report_benchmarks: [SPY, CNDR]
+  report_metrics: [sharpe, sortino]
 
 benchmarks:
   - SPY
