@@ -7,3 +7,5 @@ python-dotenv
 alpaca-py
 yfinance
 pytest
+streamlit
+plotly
