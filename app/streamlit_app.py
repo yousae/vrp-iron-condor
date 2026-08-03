@@ -200,9 +200,13 @@ def main() -> None:
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("VIX", f"{latest['vix']:.2f}")
+    m1.caption("CBOE's index of S&P 500 option prices — the market's forecast of how much the index will move over the next 30 days.")
     m2.metric("Realized vol (21d)", f"{latest['rv']:.2f}")
+    m2.caption("How much the S&P 500 actually moved over the last 21 trading days, annualized so it's on the same scale as VIX.")
     m3.metric("VRP (VIX - RV)", f"{latest['vix'] - latest['rv']:+.2f}")
+    m3.caption("Volatility risk premium: the gap between what the market feared (VIX) and what actually happened (realized vol).")
     m4.metric("IV rank (252d)", f"{latest['rank']:.0f}")
+    m4.caption("Where today's VIX sits within its own trailing 1-year range, 0-100. High = fear is unusually expensive right now.")
 
     st.divider()
 
