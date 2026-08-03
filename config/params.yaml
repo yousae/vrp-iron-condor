@@ -18,7 +18,10 @@ exit:
 
 risk:
   max_risk_per_trade_pct: 0.02
-  portfolio_heat_cap_pct: null       # TODO
+  portfolio_heat_cap_pct: 0.06       # ~3x per-trade cap; confirmed together 2026-08-03.
+                                      # v1 backtest engine only ever holds 1 position at a time,
+                                      # so this doesn't bind yet -- forward-looking for Phase 5+
+                                      # (paper trading, or overlapping cycles/thresholds later).
   starting_capital_usd: 1000         # placeholder, confirm together
   kelly_fraction: 0.5                # half-Kelly; never 1.0
 

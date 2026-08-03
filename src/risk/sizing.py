@@ -70,9 +70,10 @@ def portfolio_heat(open_position_risks: list[float], account_capital: float) -> 
     fraction of account capital. Compare against portfolio_heat_cap_pct
     in config/params.yaml before allowing a new position to open.
 
-    portfolio_heat_cap_pct is still unset (null) in config/params.yaml as
-    of this writing -- this function only computes the metric; enforcing
-    a cap against it is the caller's job, once that value is confirmed.
+    portfolio_heat_cap_pct is 0.06 in config/params.yaml (confirmed
+    2026-08-03) -- this function only computes the metric; enforcing the
+    cap against it is the caller's job, once execution code (Phase 5)
+    exists to actually gate new positions on it.
     """
     if account_capital <= 0:
         raise ValueError("account_capital must be positive")
