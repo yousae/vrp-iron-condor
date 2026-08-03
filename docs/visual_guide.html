@@ -1,0 +1,1125 @@
+<title>The Volatility Risk Premium — A Visual Field Guide</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --paper: #f1f4f6;
+    --paper-raised: #ffffff;
+    --paper-sunken: #e7ebee;
+    --ink: #101820;
+    --ink-secondary: #3e4c59;
+    --ink-muted: #5c6875;
+    --line: #d8dee4;
+    --line-strong: #c1cad2;
+
+    --gold: #8c5f16;
+    --gold-bright: #c2933b;
+    --gold-soft: #efe1c4;
+
+    --risk: #a83d24;
+    --risk-bright: #c24a2e;
+    --risk-soft: #f3dad3;
+
+    --calm: #2a6fa0;
+    --calm-bright: #3a84b8;
+    --calm-soft: #d9e7f0;
+
+    --regime-pre: #c2933b;
+    --regime-post: #a9a08c;
+
+    --good: #2f7a4f;
+    --good-soft: #dcecdf;
+
+    --shadow: 0 1px 2px rgba(16, 24, 32, 0.06), 0 6px 20px rgba(16, 24, 32, 0.06);
+    --radius: 10px;
+
+    --font-display: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, "Roboto Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0e1318;
+      --paper-raised: #161d24;
+      --paper-sunken: #0a0e12;
+      --ink: #edeff2;
+      --ink-secondary: #b8c0ca;
+      --ink-muted: #8a94a0;
+      --line: #2a333c;
+      --line-strong: #3a4550;
+
+      --gold: #d9a644;
+      --gold-bright: #d9a644;
+      --gold-soft: #3a2e17;
+
+      --risk: #e2765a;
+      --risk-bright: #e2765a;
+      --risk-soft: #3b241c;
+
+      --calm: #6fb2e0;
+      --calm-bright: #6fb2e0;
+      --calm-soft: #1b2c36;
+
+      --regime-pre: #d9a644;
+      --regime-post: #6b6a63;
+
+      --good: #5fb883;
+      --good-soft: #16241a;
+
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #0e1318;
+    --paper-raised: #161d24;
+    --paper-sunken: #0a0e12;
+    --ink: #edeff2;
+    --ink-secondary: #b8c0ca;
+    --ink-muted: #8a94a0;
+    --line: #2a333c;
+    --line-strong: #3a4550;
+    --gold: #d9a644;
+    --gold-bright: #d9a644;
+    --gold-soft: #3a2e17;
+    --risk: #e2765a;
+    --risk-bright: #e2765a;
+    --risk-soft: #3b241c;
+    --calm: #6fb2e0;
+    --calm-bright: #6fb2e0;
+    --calm-soft: #1b2c36;
+    --regime-pre: #d9a644;
+    --regime-post: #6b6a63;
+    --good: #5fb883;
+    --good-soft: #16241a;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+  :root[data-theme="light"] {
+    --paper: #f1f4f6;
+    --paper-raised: #ffffff;
+    --paper-sunken: #e7ebee;
+    --ink: #101820;
+    --ink-secondary: #3e4c59;
+    --ink-muted: #5c6875;
+    --line: #d8dee4;
+    --line-strong: #c1cad2;
+    --gold: #8c5f16;
+    --gold-bright: #c2933b;
+    --gold-soft: #efe1c4;
+    --risk: #a83d24;
+    --risk-bright: #c24a2e;
+    --risk-soft: #f3dad3;
+    --calm: #2a6fa0;
+    --calm-bright: #3a84b8;
+    --calm-soft: #d9e7f0;
+    --regime-pre: #c2933b;
+    --regime-post: #a9a08c;
+    --good: #2f7a4f;
+    --good-soft: #dcecdf;
+    --shadow: 0 1px 2px rgba(16, 24, 32, 0.06), 0 6px 20px rgba(16, 24, 32, 0.06);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { animation: none !important; transition: none !important; }
+  }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: var(--calm); }
+  a:focus-visible, button:focus-visible, .zone:focus-visible { outline: 2px solid var(--calm); outline-offset: 2px; }
+
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 700; text-wrap: balance; color: var(--ink); }
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+  .prose { max-width: 700px; }
+
+  /* ---------- top nav ---------- */
+  .topnav {
+    position: sticky; top: 0; z-index: 20;
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topnav-inner {
+    max-width: 1040px; margin: 0 auto; padding: 0 24px;
+    display: flex; align-items: center; gap: 22px;
+    height: 52px; overflow-x: auto;
+  }
+  .topnav-brand { font-family: var(--font-display); font-weight: 700; font-size: 15px; white-space: nowrap; margin-right: 8px; color: var(--ink); text-decoration: none; }
+  .topnav a.section-link {
+    font-size: 13px; color: var(--ink-muted); text-decoration: none; white-space: nowrap;
+    padding: 4px 2px; border-bottom: 2px solid transparent;
+  }
+  .topnav a.section-link.active { color: var(--ink); border-bottom-color: var(--gold-bright); }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 56px 0 40px; border-bottom: 1px solid var(--line); }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-muted); margin: 0 0 14px;
+  }
+  .hero h1 { font-size: 40px; line-height: 1.12; margin: 0 0 14px; letter-spacing: -0.01em; }
+  .hero p.lede { font-size: 18px; color: var(--ink-secondary); margin: 0 0 28px; max-width: 640px; }
+
+  .fact-strip { display: flex; flex-wrap: wrap; gap: 10px; }
+  .fact {
+    background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 10px 14px; box-shadow: var(--shadow);
+  }
+  .fact .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-muted); }
+  .fact .v { font-family: var(--font-mono); font-size: 15px; font-weight: 600; color: var(--ink); }
+
+  /* ---------- sections ---------- */
+  section { padding: 56px 0; border-bottom: 1px solid var(--line); }
+  section:last-of-type { border-bottom: none; }
+  .section-num { font-family: var(--font-mono); font-size: 12px; color: var(--gold); letter-spacing: 0.04em; }
+  section h2 { font-size: 28px; margin: 6px 0 12px; }
+  section > .wrap > p.intro { font-size: 16px; color: var(--ink-secondary); max-width: 700px; margin: 0 0 32px; }
+
+  /* ---------- intuition / technical dual panel ---------- */
+  .dual { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin: 28px 0; }
+  @media (max-width: 720px) { .dual { grid-template-columns: 1fr; } }
+  .panel { background: var(--paper-raised); padding: 22px 24px; }
+  .panel-label {
+    display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.06em; padding: 3px 9px; border-radius: 999px; margin-bottom: 12px;
+  }
+  .panel.intuition .panel-label { background: var(--calm-soft); color: var(--calm); }
+  .panel.technical .panel-label { background: var(--gold-soft); color: var(--gold); }
+  .panel p { margin: 0 0 10px; color: var(--ink-secondary); font-size: 15px; }
+  .panel p:last-child { margin-bottom: 0; }
+
+  /* ---------- typeset equations ---------- */
+  .eq-block { background: var(--paper-sunken); border: 1px solid var(--line); border-radius: 8px; padding: 18px 18px 16px; margin: 14px 0; }
+  .eq-formula {
+    font-family: var(--font-display); font-style: italic; font-size: 19px; color: var(--ink);
+    display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 5px;
+    padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line-strong);
+    overflow-x: auto;
+  }
+  .eq-formula .rm { font-style: normal; }
+  .eq-formula sub { font-size: 0.68em; font-style: italic; }
+  .eq-frac { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; margin: 0 4px; font-size: 0.88em; line-height: 1.3; }
+  .eq-frac .num { padding: 0 4px 3px; border-bottom: 1.5px solid currentColor; }
+  .eq-frac .den { padding: 3px 4px 0; }
+  .eq-sqrt { display: inline-flex; align-items: flex-start; margin: 0 2px; }
+  .eq-sqrt .radic { font-style: normal; font-size: 1.1em; padding-right: 1px; transform: scaleY(1.15) translateY(1px); display: inline-block; }
+  .eq-sqrt .radicand { border-top: 1.5px solid currentColor; padding: 0 3px; }
+  .eq-legend { display: grid; grid-template-columns: auto 1fr; gap: 7px 16px; margin: 0; }
+  .eq-legend dt { font-family: var(--font-display); font-style: italic; font-size: 14.5px; color: var(--ink); text-align: right; white-space: nowrap; }
+  .eq-legend dt sub { font-size: 0.7em; }
+  .eq-legend dd { margin: 0; color: var(--ink-secondary); font-size: 13.5px; font-family: var(--font-body); font-style: normal; line-height: 1.5; }
+
+  /* ---------- callouts ---------- */
+  .callout { border-radius: var(--radius); padding: 18px 20px; margin: 24px 0; border: 1px solid; }
+  .callout.caveat { background: var(--risk-soft); border-color: color-mix(in srgb, var(--risk) 35%, transparent); }
+  .callout.caveat .callout-label { color: var(--risk); }
+  .callout.good { background: var(--good-soft); border-color: color-mix(in srgb, var(--good) 35%, transparent); }
+  .callout.good .callout-label { color: var(--good); }
+  .callout-label { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; display: block; margin-bottom: 8px; }
+  .callout p { margin: 0 0 8px; color: var(--ink-secondary); font-size: 14.5px; }
+  .callout ul { margin: 8px 0 0; padding-left: 18px; color: var(--ink-secondary); font-size: 14.5px; }
+  .callout li { margin-bottom: 4px; }
+
+  /* ---------- chart card ---------- */
+  .chart-card { background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px 20px 12px; margin: 28px 0; }
+  .chart-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+  .chart-title { font-weight: 700; font-size: 14px; }
+  .chart-sub { font-size: 12.5px; color: var(--ink-muted); }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 10px 2px 0; font-size: 12.5px; color: var(--ink-secondary); }
+  .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-swatch { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
+  .chart-svg-wrap { position: relative; width: 100%; overflow: hidden; }
+  svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
+  .tooltip {
+    position: absolute; pointer-events: none; background: var(--ink); color: var(--paper);
+    font-family: var(--font-mono); font-size: 12px; padding: 8px 10px; border-radius: 6px; line-height: 1.5;
+    transform: translate(-50%, -110%); white-space: nowrap; box-shadow: var(--shadow); opacity: 0; transition: opacity 0.1s;
+    z-index: 5;
+  }
+  :root[data-theme="dark"] .tooltip, @media (prefers-color-scheme: dark) { }
+  .tooltip.visible { opacity: 1; }
+  .axis-label { font-family: var(--font-mono); font-size: 10px; fill: var(--ink-muted); }
+  .grid-line { stroke: var(--line); stroke-width: 1; }
+  .crosshair { stroke: var(--ink-muted); stroke-width: 1; stroke-dasharray: 3 3; }
+
+  /* ---------- pipeline diagram ---------- */
+  .pipeline { display: flex; gap: 0; overflow-x: auto; padding: 8px 2px 20px; margin: 24px 0; }
+  .pipe-node {
+    flex: 0 0 172px; background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 14px 14px; box-shadow: var(--shadow); position: relative;
+  }
+  .pipe-arrow { flex: 0 0 28px; display: flex; align-items: center; justify-content: center; color: var(--ink-muted); font-size: 18px; }
+  .pipe-node .stage { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); margin-bottom: 6px; }
+  .pipe-node .file { font-family: var(--font-mono); font-size: 12.5px; font-weight: 700; color: var(--ink); margin-bottom: 6px; word-break: break-word; }
+  .pipe-node .job { font-size: 12.5px; color: var(--ink-secondary); margin-bottom: 10px; min-height: 48px; }
+  .status-chip { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10.5px; padding: 3px 8px; border-radius: 999px; font-weight: 600; }
+  .status-chip.built { background: var(--good-soft); color: var(--good); }
+  .status-chip.stub { background: var(--gold-soft); color: var(--gold); }
+  .status-chip.pending { background: var(--paper-sunken); color: var(--ink-muted); }
+  .status-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* ---------- payoff diagram ---------- */
+  .payoff-card { background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; margin: 28px 0; }
+  .zone { cursor: default; }
+  .zone-label { font-family: var(--font-mono); font-size: 11px; fill: var(--ink-secondary); }
+  .strike-label { font-family: var(--font-mono); font-size: 11px; fill: var(--ink-muted); }
+
+  /* ---------- results table ---------- */
+  table.results { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 20px 0; }
+  table.results th, table.results td { text-align: right; padding: 9px 12px; border-bottom: 1px solid var(--line); font-family: var(--font-mono); }
+  table.results th:first-child, table.results td:first-child { text-align: left; font-family: var(--font-body); }
+  table.results thead th { color: var(--ink-muted); font-weight: 600; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.04em; border-bottom: 1px solid var(--line-strong); }
+  table.results tbody tr:hover { background: var(--paper-sunken); }
+  .table-scroll { overflow-x: auto; }
+
+  /* ---------- footer ---------- */
+  footer { padding: 40px 0 80px; }
+  footer .wrap { color: var(--ink-muted); font-size: 13px; }
+  footer a { color: var(--ink-muted); }
+
+  .badge-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .badge { font-family: var(--font-mono); font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--ink-muted); }
+</style>
+
+<nav class="topnav">
+  <div class="topnav-inner" id="topnav-inner">
+    <a class="topnav-brand" href="#top">VRP Field Guide</a>
+    <a class="section-link" href="#idea">The Idea</a>
+    <a class="section-link" href="#trade">The Trade</a>
+    <a class="section-link" href="#signal">The Signal</a>
+    <a class="section-link" href="#pipeline">The Pipeline</a>
+    <a class="section-link" href="#results">What We Know</a>
+  </div>
+</nav>
+
+<div id="top"></div>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">vrp-iron-condor · visual field guide</p>
+    <h1>Selling insurance on the S&amp;P 500, systematically</h1>
+    <p class="lede">
+      This page is a plain-language walkthrough of what the project actually does — for anyone who wants the
+      intuition without reading the code, and the real numbers for anyone who wants those too.
+    </p>
+    <div class="fact-strip">
+      <div class="fact"><div class="k">Underlying</div><div class="v">SPX</div></div>
+      <div class="fact"><div class="k">Structure</div><div class="v">Iron condor, monthly</div></div>
+      <div class="fact"><div class="k">Phase</div><div class="v">3 of 8 — backtest engine</div></div>
+      <div class="fact"><div class="k">Status</div><div class="v">Research only, no live trading</div></div>
+      <div class="fact"><div class="k">Data refreshed</div><div class="v" id="data-asof">—</div></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ SECTION 1: THE IDEA ============ -->
+<section id="idea">
+  <div class="wrap">
+    <span class="section-num">01</span>
+    <h2>The core idea: fear is overpriced</h2>
+    <p class="intro">
+      Every S&amp;P 500 option has a price, and buried inside that price is the market's guess at how much the index
+      will move before the option expires. That guess — <strong>implied volatility</strong> — tends to run higher
+      than the volatility that actually shows up. The gap between the two is the volatility risk premium, and it's
+      the entire reason this strategy exists.
+    </p>
+
+    <div class="chart-card" id="vrp-chart-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">VIX (priced fear) vs. realized volatility (what actually happened)</div>
+          <div class="chart-sub">Weekly, <span id="vrp-date-range">—</span> · real data pulled by <span class="mono">src/data/proxy_signal.py</span></div>
+        </div>
+      </div>
+      <div class="chart-svg-wrap" id="vrp-chart-wrap">
+        <svg class="chart" id="vrp-chart" viewBox="0 0 960 340" preserveAspectRatio="none" role="img" aria-label="Line chart comparing weekly VIX to realized volatility from 2019 to 2023, with the gap between them shaded gold"></svg>
+        <div class="tooltip" id="vrp-tooltip"></div>
+      </div>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--risk-bright)"></span>VIX (implied)</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--calm-bright)"></span>Realized vol (21-day)</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--gold-bright); opacity:0.5"></span>Gap = the premium</span>
+      </div>
+    </div>
+
+    <div class="callout good">
+      <span class="callout-label">What this chart actually says</span>
+      <p>
+        Over these <span id="week-count">—</span> weeks, VIX averaged <strong id="mean-vix">—</strong> while realized volatility averaged
+        <strong id="mean-rv">—</strong> — and VIX sat above realized vol in <strong id="pct-weeks-above">—</strong> of weeks. That gold gap is
+        money that option <em>sellers</em> collected on average, and money that option <em>buyers</em> overpaid for
+        protection they mostly didn't end up needing. Notice March 2020: the one stretch where realized vol actually
+        <em>exceeded</em> VIX — the premium inverted violently, which is exactly the tail risk this whole strategy
+        is being paid to bear.
+      </p>
+    </div>
+
+    <div class="dual">
+      <div class="panel intuition">
+        <span class="panel-label">Plain English</span>
+        <p>
+          Think of VIX like the price of car insurance. Insurance companies don't price a policy at the exact
+          expected cost of an accident — they price in a margin, because they're the ones on the hook if something
+          goes wrong. Options are the same: the people selling them (index option market makers, effectively) charge
+          a bit more than the "fair" price of the risk, because they need to be compensated for occasionally
+          getting hit with a real crash.
+        </p>
+        <p>
+          This project is built around <em>being the insurance company</em> instead of the person buying the policy
+          — collecting that margin systematically, in a way that's designed so no single bad month can wipe out the
+          account.
+        </p>
+      </div>
+      <div class="panel technical">
+        <span class="panel-label">The Math</span>
+        <p>VIX is (roughly) the market's model-free estimate of 30-day annualized S&amp;P 500 volatility, derived
+          from a basket of option prices. Realized volatility over the same horizon is computed directly from what
+          the index actually did:</p>
+        <div class="eq-block">
+          <div class="eq-formula">
+            <span>RV</span><span>=</span>
+            <span class="eq-sqrt"><span class="radic">√</span><span class="radicand">252</span></span>
+            <span>×</span>
+            <span class="rm">std</span><span>(</span><span class="rm">ln</span><span>(</span><span>P<sub>t</sub></span><span>/</span><span>P<sub>t−1</sub></span><span>)</span><span>)</span>
+          </div>
+          <dl class="eq-legend">
+            <dt>P<sub>t</sub></dt><dd>SPX closing price on day t</dd>
+            <dt>P<sub>t−1</sub></dt><dd>SPX closing price the prior trading day</dd>
+            <dt>std(&middot;)</dt><dd>standard deviation, taken over the trailing 21-day window ending at t</dd>
+            <dt>252</dt><dd>trading days per year — the annualization factor</dd>
+          </dl>
+        </div>
+        <p>
+          The volatility risk premium is just <span class="mono">VIX − RV</span>. It's been documented across
+          methodologies going back to Coval &amp; Shumway (2001) and Bakshi &amp; Kapadia (2003) — see
+          <span class="mono">docs/research/vrp_literature_review.md</span> for the full citation trail.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECTION 2: THE TRADE ============ -->
+<section id="trade">
+  <div class="wrap">
+    <span class="section-num">02</span>
+    <h2>The trade: an iron condor</h2>
+    <p class="intro">
+      You can't just "sell the VIX." The actual trade is four option legs at once, structured so the maximum loss
+      is known and fixed the moment the trade opens — this is not naked put selling.
+    </p>
+
+    <div class="payoff-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">Iron condor payoff at expiration</div>
+          <div class="chart-sub">Hover a zone for what's happening there</div>
+        </div>
+      </div>
+      <div class="chart-svg-wrap">
+        <svg class="chart" id="payoff-chart" viewBox="0 0 960 320" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Iron condor payoff diagram: flat profit in the middle, sloped losses on both wings, capped at the outer strikes"></svg>
+        <div class="tooltip" id="payoff-tooltip"></div>
+      </div>
+    </div>
+
+    <div class="dual">
+      <div class="panel intuition">
+        <span class="panel-label">Plain English</span>
+        <p>
+          You're selling a put and a call that are both moderately close to the current price (the "short" strikes,
+          around 20-delta — roughly a 1-in-5 chance of finishing in the money), which is where most of the premium
+          is. Then you <em>buy</em> a further-out put and call (the "long" wings, around 5-delta) purely as
+          insurance for yourself.
+        </p>
+        <p>
+          If the index stays roughly where it is, all four options expire worthless and you keep the full credit.
+          If it moves a lot in either direction, you start losing — but the wings mean the loss stops growing past a
+          certain point. You know your worst case before you ever place the trade.
+        </p>
+      </div>
+      <div class="panel technical">
+        <span class="panel-label">The Math</span>
+        <p>Max profit = net credit received. Max loss = (wing width − net credit), and it's the same formula whether
+          the index crashes or melts up:</p>
+        <div class="eq-block">
+          <div class="eq-formula">
+            <span>L<sub>max</sub></span><span>=</span><span>(</span><span>K<sub>short</sub></span><span>−</span><span>K<sub>long</sub></span><span>)</span><span>−</span><span>credit</span>
+          </div>
+          <dl class="eq-legend">
+            <dt>L<sub>max</sub></dt><dd>maximum possible loss on the trade — known and fixed at entry</dd>
+            <dt>K<sub>short</sub></dt><dd>the strike you sold (the short put or call, closer to the money)</dd>
+            <dt>K<sub>long</sub></dt><dd>the strike you bought (the long put or call — the wing, further out)</dd>
+            <dt>credit</dt><dd>net premium collected when the trade was opened</dd>
+          </dl>
+        </div>
+        <p>
+          Because the loss is bounded, this position is <em>Kelly-tractable</em> — the Kelly criterion needs a known
+          loss size to compute a bet size, which a naked put (unbounded loss) can't give you. That's the whole
+          reason <span class="mono">src/risk/sizing.py</span> can eventually compute a real position size here.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECTION 3: THE SIGNAL ============ -->
+<section id="signal">
+  <div class="wrap">
+    <span class="section-num">03</span>
+    <h2>The signal: only trade when fear is expensive</h2>
+    <p class="intro">
+      Selling premium every single month regardless of conditions is one strategy. This project does something more
+      specific: only opens a trade when implied volatility is elevated <em>relative to its own recent history</em> —
+      the "IV rank" filter.
+    </p>
+
+    <div class="chart-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">IV rank over time, with the three thresholds being tested</div>
+          <div class="chart-sub">252-day trailing lookback · shaded bands show where each threshold would fire</div>
+        </div>
+      </div>
+      <div class="chart-svg-wrap" id="rank-chart-wrap">
+        <svg class="chart" id="rank-chart" viewBox="0 0 960 300" preserveAspectRatio="none" role="img" aria-label="Line chart of IV rank from 0 to 100 over time, with horizontal reference lines at 50, 70, and 80"></svg>
+        <div class="tooltip" id="rank-tooltip"></div>
+      </div>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--gold-bright)"></span>IV rank (0–100)</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--ink-muted); height:1px"></span>Thresholds: 50 / 70 / 80</span>
+      </div>
+    </div>
+
+    <div class="dual">
+      <div class="panel intuition">
+        <span class="panel-label">Plain English</span>
+        <p>
+          IV rank asks one question: <em>compared to the last year, is implied volatility high or low right now?</em>
+          A VIX of 20 means something completely different in a calm year (that would be unusually high) versus a
+          turbulent one (that might be unusually low). IV rank puts every day on the same 0–100 scale so the signal
+          adapts to the current regime instead of using one fixed VIX number forever.
+        </p>
+        <p>The chart makes it visible: the same VIX level in early 2020 vs. mid-2022 produces a very different rank,
+          because "recent history" itself shifted.</p>
+      </div>
+      <div class="panel technical">
+        <span class="panel-label">The Math</span>
+        <div class="eq-block">
+          <div class="eq-formula">
+            <span>IV<sub>rank</sub>(t)</span><span>=</span><span>100</span><span>×</span>
+            <span class="eq-frac">
+              <span class="num">IV<sub>t</sub> − Min<sub>t</sub></span>
+              <span class="den">Max<sub>t</sub> − Min<sub>t</sub></span>
+            </span>
+          </div>
+          <dl class="eq-legend">
+            <dt>IV<sub>t</sub></dt><dd>implied volatility (VIX) on day t</dd>
+            <dt>Min<sub>t</sub>, Max<sub>t</sub></dt><dd>the minimum and maximum IV over the trailing 252 trading days ending at t — never including data from after day t</dd>
+          </dl>
+        </div>
+        <p>
+          The window is <strong>trailing</strong> — day t's rank only ever uses data through day t. This sounds
+          obvious, but it's the single easiest way to accidentally cheat in a backtest: if a "252-day window" quietly
+          includes a few days from the future, the signal looks smarter than it could ever have been traded live.
+          Every function in this project that touches history gets a specific test for this
+          (<span class="mono">tests/test_iv_rank.py</span>, <span class="mono">tests/test_backtest_engine.py</span>).
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECTION 4: THE PIPELINE ============ -->
+<section id="pipeline">
+  <div class="wrap">
+    <span class="section-num">04</span>
+    <h2>The pipeline, and what's actually built</h2>
+    <p class="intro">
+      Each stage below is a real file in the repo. Green means it's implemented and tested; amber means it's a
+      documented stub waiting on the stage before it; grey hasn't been started.
+    </p>
+
+    <div class="pipeline" id="pipeline-row">
+      <div class="pipe-node">
+        <div class="stage">Data</div>
+        <div class="file">proxy_signal.py</div>
+        <div class="job">Pull VIX, SPX, and T-bill history as a stand-in for real options data</div>
+        <span class="status-chip built"><span class="dot"></span>Built</span>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node">
+        <div class="stage">Signal</div>
+        <div class="file">iv_rank.py</div>
+        <div class="job">Is implied vol rich right now, relative to its own last year?</div>
+        <span class="status-chip built"><span class="dot"></span>Built</span>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node">
+        <div class="stage">Pricing</div>
+        <div class="file">pricing.py</div>
+        <div class="job">Black-Scholes proxy: price the 4 condor legs off VIX (no real chain data yet)</div>
+        <span class="status-chip built"><span class="dot"></span>Built</span>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node">
+        <div class="stage">Backtest</div>
+        <div class="file">engine.py</div>
+        <div class="job">Roll monthly trades, log every one, compute Sharpe / Sortino / drawdown</div>
+        <span class="status-chip built"><span class="dot"></span>Built</span>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node">
+        <div class="stage">Risk</div>
+        <div class="file">sizing.py</div>
+        <div class="job">Half-Kelly position size, hard-capped — never full Kelly</div>
+        <span class="status-chip stub"><span class="dot"></span>Stub</span>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node">
+        <div class="stage">Execution</div>
+        <div class="file">alpaca_client.py</div>
+        <div class="job">Paper-trade the strategy live via Alpaca's API</div>
+        <span class="status-chip stub"><span class="dot"></span>Stub</span>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node">
+        <div class="stage">Decision</div>
+        <div class="file">go / no-go</div>
+        <div class="job">Beat SPY and CBOE's CNDR index on both Sharpe and Sortino before risking real capital</div>
+        <span class="status-chip pending"><span class="dot"></span>Not started</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECTION 5: RESULTS ============ -->
+<section id="results">
+  <div class="wrap">
+    <span class="section-num">05</span>
+    <h2>What we know so far</h2>
+    <p class="intro">
+      These are real outputs from <span class="mono">src/backtest/engine.py</span> run against <span id="backtest-window">—</span> data, at
+      all three pre-registered IV-rank thresholds. Read the caveat below before drawing any conclusions from them.
+    </p>
+
+    <div class="chart-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">Sharpe ratio by threshold, pre- vs. post-2010</div>
+          <div class="chart-sub">Reported separately, never blended — see the standing rule this project follows</div>
+        </div>
+      </div>
+      <div class="chart-svg-wrap" id="bar-chart-wrap">
+        <svg class="chart" id="bar-chart" viewBox="0 0 960 300" preserveAspectRatio="none" role="img" aria-label="Grouped bar chart of Sharpe ratio for IV rank thresholds 50, 70, and 80, comparing pre-2010 and post-2010 periods"></svg>
+        <div class="tooltip" id="bar-tooltip"></div>
+      </div>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--regime-pre)"></span>Pre-2010</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--regime-post)"></span>Post-2010</span>
+      </div>
+    </div>
+
+    <div class="callout good">
+      <span class="callout-label">The pattern worth noticing</span>
+      <p id="pattern-text">—</p>
+    </div>
+
+    <div class="table-scroll">
+      <table class="results" id="results-table">
+        <thead>
+          <tr><th>Threshold</th><th>Regime</th><th>Trades</th><th>Win rate</th><th>Sharpe</th><th>Sortino</th><th>Worst trade</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="callout caveat">
+      <span class="callout-label">Why these numbers aren't the final answer</span>
+      <ul>
+        <li><strong>No real options chain data yet.</strong> Every trade is priced with Black-Scholes off VIX as a
+          single flat volatility — real SPX puts trade at a noticeably higher implied vol than calls at the same
+          delta (skew), which this proxy can't see. That understates the credit collected on the put wing.</li>
+        <li><strong>One contract sized against a $1,000 placeholder account.</strong> Worst-case single trades ran
+          <span id="worst-trade-range">—</span> against that $1,000 figure — a clear sign that real position sizing
+          (<span class="mono">src/risk/sizing.py</span>, still a stub) has to exist before any of this is tradeable,
+          not just nice to have.</li>
+        <li><strong>Hold-to-expiration only.</strong> No early profit-taking or defensive exits modeled yet (v2 in
+          the spec).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>
+      Built from real output of <span class="mono">src/backtest/engine.py</span>, <span class="mono">src/signals/iv_rank.py</span>,
+      and <span class="mono">src/data/proxy_signal.py</span> — nothing on this page is illustrative or made up.
+      Full methodology in <span class="mono">docs/project_spec.md</span>, academic background in
+      <span class="mono">docs/research/vrp_literature_review.md</span>.
+    </p>
+    <div class="badge-row">
+      <span class="badge">Educational / research project</span>
+      <span class="badge">No live trading</span>
+      <span class="badge">Phase 3 of 8</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var DATA = {"dates":["2019-01-06","2019-01-13","2019-01-20","2019-01-27","2019-02-03","2019-02-10","2019-02-17","2019-02-24","2019-03-03","2019-03-10","2019-03-17","2019-03-24","2019-03-31","2019-04-07","2019-04-14","2019-04-21","2019-04-28","2019-05-05","2019-05-12","2019-05-19","2019-05-26","2019-06-02","2019-06-09","2019-06-16","2019-06-23","2019-06-30","2019-07-07","2019-07-14","2019-07-21","2019-07-28","2019-08-04","2019-08-11","2019-08-18","2019-08-25","2019-09-01","2019-09-08","2019-09-15","2019-09-22","2019-09-29","2019-10-06","2019-10-13","2019-10-20","2019-10-27","2019-11-03","2019-11-10","2019-11-17","2019-11-24","2019-12-01","2019-12-08","2019-12-15","2019-12-22","2019-12-29","2020-01-05","2020-01-12","2020-01-19","2020-01-26","2020-02-02","2020-02-09","2020-02-16","2020-02-23","2020-03-01","2020-03-08","2020-03-15","2020-03-22","2020-03-29","2020-04-05","2020-04-12","2020-04-19","2020-04-26","2020-05-03","2020-05-10","2020-05-17","2020-05-24","2020-05-31","2020-06-07","2020-06-14","2020-06-21","2020-06-28","2020-07-05","2020-07-12","2020-07-19","2020-07-26","2020-08-02","2020-08-09","2020-08-16","2020-08-23","2020-08-30","2020-09-06","2020-09-13","2020-09-20","2020-09-27","2020-10-04","2020-10-11","2020-10-18","2020-10-25","2020-11-01","2020-11-08","2020-11-15","2020-11-22","2020-11-29","2020-12-06","2020-12-13","2020-12-20","2020-12-27","2021-01-03","2021-01-10","2021-01-17","2021-01-24","2021-01-31","2021-02-07","2021-02-14","2021-02-21","2021-02-28","2021-03-07","2021-03-14","2021-03-21","2021-03-28","2021-04-04","2021-04-11","2021-04-18","2021-04-25","2021-05-02","2021-05-09","2021-05-16","2021-05-23","2021-05-30","2021-06-06","2021-06-13","2021-06-20","2021-06-27","2021-07-04","2021-07-11","2021-07-18","2021-07-25","2021-08-01","2021-08-08","2021-08-15","2021-08-22","2021-08-29","2021-09-05","2021-09-12","2021-09-19","2021-09-26","2021-10-03","2021-10-10","2021-10-17","2021-10-24","2021-10-31","2021-11-07","2021-11-14","2021-11-21","2021-11-28","2021-12-05","2021-12-12","2021-12-19","2021-12-26","2022-01-02","2022-01-09","2022-01-16","2022-01-23","2022-01-30","2022-02-06","2022-02-13","2022-02-20","2022-02-27","2022-03-06","2022-03-13","2022-03-20","2022-03-27","2022-04-03","2022-04-10","2022-04-17","2022-04-24","2022-05-01","2022-05-08","2022-05-15","2022-05-22","2022-05-29","2022-06-05","2022-06-12","2022-06-19","2022-06-26","2022-07-03","2022-07-10","2022-07-17","2022-07-24","2022-07-31","2022-08-07","2022-08-14","2022-08-21","2022-08-28","2022-09-04","2022-09-11","2022-09-18","2022-09-25","2022-10-02","2022-10-09","2022-10-16","2022-10-23","2022-10-30","2022-11-06","2022-11-13","2022-11-20","2022-11-27","2022-12-04","2022-12-11","2022-12-18","2022-12-25","2023-01-01","2023-01-08","2023-01-15","2023-01-22","2023-01-29","2023-02-05","2023-02-12","2023-02-19","2023-02-26","2023-03-05","2023-03-12","2023-03-19","2023-03-26","2023-04-02","2023-04-09","2023-04-16","2023-04-23","2023-04-30","2023-05-07","2023-05-14","2023-05-21","2023-05-28","2023-06-04","2023-06-11","2023-06-18","2023-06-25","2023-07-02","2023-07-09","2023-07-16","2023-07-23","2023-07-30","2023-08-06","2023-08-13","2023-08-20","2023-08-27","2023-09-03","2023-09-10","2023-09-17","2023-09-24","2023-10-01","2023-10-08","2023-10-15","2023-10-22","2023-10-29","2023-11-05","2023-11-12","2023-11-19","2023-11-26","2023-12-03","2023-12-10","2023-12-17","2023-12-24","2023-12-31","2024-01-07","2024-01-14","2024-01-21","2024-01-28","2024-02-04","2024-02-11","2024-02-18","2024-02-25","2024-03-03","2024-03-10","2024-03-17","2024-03-24","2024-03-31","2024-04-07","2024-04-14","2024-04-21","2024-04-28","2024-05-05","2024-05-12","2024-05-19","2024-05-26","2024-06-02","2024-06-09","2024-06-16","2024-06-23","2024-06-30","2024-07-07","2024-07-14","2024-07-21","2024-07-28","2024-08-04","2024-08-11","2024-08-18","2024-08-25","2024-09-01","2024-09-08","2024-09-15","2024-09-22","2024-09-29","2024-10-06","2024-10-13","2024-10-20","2024-10-27","2024-11-03","2024-11-10","2024-11-17","2024-11-24","2024-12-01","2024-12-08","2024-12-15","2024-12-22","2024-12-29","2025-01-05","2025-01-12","2025-01-19","2025-01-26","2025-02-02","2025-02-09","2025-02-16","2025-02-23","2025-03-02","2025-03-09","2025-03-16","2025-03-23","2025-03-30","2025-04-06","2025-04-13","2025-04-20","2025-04-27","2025-05-04","2025-05-11","2025-05-18","2025-05-25","2025-06-01","2025-06-08","2025-06-15","2025-06-22","2025-06-29","2025-07-06","2025-07-13","2025-07-20","2025-07-27","2025-08-03","2025-08-10","2025-08-17","2025-08-24","2025-08-31","2025-09-07","2025-09-14","2025-09-21","2025-09-28","2025-10-05","2025-10-12","2025-10-19","2025-10-26","2025-11-02","2025-11-09","2025-11-16","2025-11-23","2025-11-30","2025-12-07","2025-12-14","2025-12-21","2025-12-28","2026-01-04","2026-01-11","2026-01-18","2026-01-25","2026-02-01","2026-02-08","2026-02-15","2026-02-22","2026-03-01","2026-03-08","2026-03-15","2026-03-22","2026-03-29","2026-04-05","2026-04-12","2026-04-19","2026-04-26","2026-05-03","2026-05-10","2026-05-17","2026-05-24","2026-05-31","2026-06-07","2026-06-14","2026-06-21","2026-06-28","2026-07-05","2026-07-12","2026-07-19","2026-07-26","2026-08-02","2026-08-09"],"vix":[21.38,18.19,17.8,17.42,16.14,15.72,14.91,13.51,13.57,16.05,12.88,16.48,13.71,12.82,12.01,12.09,12.73,12.87,16.04,15.96,15.85,18.71,16.3,15.28,15.4,15.08,13.28,12.39,14.45,12.16,17.61,17.97,18.47,19.87,18.98,15.0,13.74,15.32,17.22,17.04,15.58,14.25,12.65,12.3,12.07,12.05,12.34,12.62,13.62,12.63,12.51,13.43,14.02,12.56,12.1,14.56,18.84,15.47,13.68,17.08,40.11,41.94,57.83,66.04,65.54,46.8,41.67,38.15,35.93,37.19,27.98,31.89,28.16,27.51,24.52,36.09,35.12,34.73,27.68,27.29,25.68,25.84,24.46,22.21,22.05,22.54,22.96,30.75,26.87,25.83,26.38,27.63,25.0,27.41,27.55,38.02,24.86,23.1,23.7,20.84,20.79,23.31,21.57,21.53,22.75,21.56,24.34,21.91,33.09,20.87,19.97,22.05,27.95,24.66,20.69,20.95,18.86,17.33,16.69,16.25,17.33,18.61,16.69,18.81,20.15,16.76,16.42,15.65,20.7,15.62,15.07,16.18,18.45,17.2,18.24,16.15,15.45,18.56,16.39,16.41,20.95,20.81,17.75,21.1,18.77,16.3,15.43,16.26,16.48,16.29,17.91,28.62,30.67,18.69,21.57,17.96,17.22,18.76,19.19,28.85,27.66,23.22,27.36,27.75,27.59,31.98,30.75,23.87,20.81,19.63,21.16,22.7,28.21,33.4,30.19,28.87,29.43,25.72,24.79,27.75,31.13,27.23,26.7,24.64,24.23,23.03,21.33,21.15,19.53,20.6,25.56,25.47,22.79,26.3,29.92,31.62,31.36,32.02,29.69,25.75,24.55,22.52,23.12,20.5,19.06,22.83,22.62,20.87,21.67,21.13,18.35,19.85,18.51,18.33,20.53,20.02,21.67,18.49,24.8,25.51,21.74,18.7,18.4,17.07,16.77,15.78,17.19,17.03,16.81,17.95,14.6,13.83,13.54,13.44,13.59,14.83,13.34,13.6,13.33,17.1,14.84,17.3,15.68,13.09,13.84,13.79,17.2,17.52,17.45,19.32,21.71,21.27,14.91,14.17,13.8,12.46,12.63,12.35,12.28,13.03,12.45,13.35,12.7,13.3,13.26,13.85,12.93,14.24,13.75,13.11,14.74,14.41,13.06,13.01,16.03,17.31,18.71,15.03,13.49,12.55,11.99,11.93,12.92,12.22,12.66,13.2,12.44,12.48,12.46,16.52,16.39,23.39,20.37,14.8,15.86,15.0,22.38,16.56,16.15,16.96,19.21,20.46,18.03,20.33,21.88,14.94,16.14,15.24,13.51,12.77,13.81,18.36,15.95,16.13,19.54,15.97,14.85,16.43,16.54,14.77,18.21,19.63,23.37,21.77,19.28,21.65,45.31,37.56,29.65,24.84,22.68,21.9,17.24,22.29,18.57,16.77,20.82,20.62,16.32,16.38,16.4,16.41,14.93,20.38,15.15,15.09,14.22,15.36,15.18,14.76,15.45,15.29,16.65,21.66,20.78,16.37,17.44,19.08,19.83,23.43,16.35,15.41,15.74,14.91,13.6,14.51,14.49,15.86,16.09,17.44,20.37,20.6,19.09,19.86,29.49,27.19,26.78,31.05,23.87,19.23,17.48,18.71,16.99,17.19,18.43,16.7,15.32,21.51,17.68,16.4,18.41,16.15,15.03,18.77,18.58,15.99,15.63],"rv":[31.7,29.59,28.37,23.4,18.48,11.84,12.19,10.13,8.36,8.93,8.95,11.36,11.74,11.08,10.42,10.3,6.38,6.72,8.94,13.2,13.84,14.3,16.15,13.24,12.82,11.73,7.98,7.6,8.14,7.48,8.56,15.82,20.53,22.71,23.26,20.83,14.84,13.43,9.43,11.27,13.52,14.05,13.78,10.86,6.93,5.8,5.35,5.83,7.25,7.82,7.72,7.5,7.15,6.92,6.96,7.87,11.91,13.17,13.11,13.58,24.48,35.38,68.34,84.69,95.42,93.9,91.43,57.94,47.99,38.68,28.93,27.37,24.41,22.69,20.77,29.09,27.22,29.68,30.12,29.38,19.01,17.07,13.58,11.57,10.85,9.5,7.98,16.65,20.88,21.95,23.93,24.05,18.88,19.16,16.49,21.37,22.45,22.52,22.6,16.61,13.68,12.35,10.2,8.43,8.08,10.97,10.36,11.23,16.42,17.06,16.29,15.26,15.75,17.42,18.06,18.85,17.34,14.53,11.83,11.99,11.37,10.81,10.1,14.52,14.25,13.99,13.89,9.39,8.28,8.56,8.75,9.71,10.11,11.37,11.76,11.49,10.73,8.39,8.66,7.61,8.5,8.5,10.98,13.61,15.22,16.25,13.98,10.83,8.19,6.93,6.74,10.65,14.48,16.96,18.77,20.57,16.7,15.72,14.68,15.35,16.5,19.58,21.88,22.37,24.2,22.66,24.42,26.11,24.03,22.6,18.34,16.68,18.88,24.35,28.89,31.6,34.15,33.9,30.7,28.73,28.76,31.57,29.96,29.02,23.26,20.57,19.19,19.17,19.1,17.35,20.55,19.64,20.43,24.58,24.66,24.0,28.73,26.45,29.2,28.34,26.82,30.45,27.87,26.49,25.64,25.59,19.79,20.47,17.91,19.1,18.69,17.67,16.5,17.33,16.39,16.18,16.76,15.72,15.61,17.74,17.99,18.64,17.16,13.81,9.26,12.32,13.91,13.2,14.21,13.18,13.19,11.48,11.52,11.29,10.75,10.25,10.11,9.34,8.71,9.34,9.14,9.85,11.94,11.95,11.43,11.79,12.36,10.7,12.79,12.65,12.93,13.37,15.66,15.94,15.32,12.82,10.86,10.09,6.92,9.4,9.42,10.08,10.66,11.14,8.98,11.32,10.66,11.95,13.52,12.01,12.33,11.65,9.36,9.69,10.64,11.22,10.92,12.63,14.21,13.6,11.65,10.75,9.33,8.44,7.84,8.25,7.02,6.42,7.26,9.55,13.76,16.5,21.15,22.05,20.55,19.26,16.91,15.11,14.93,13.86,11.67,9.76,8.89,9.45,11.19,13.57,14.07,13.74,13.91,7.68,8.41,13.12,14.1,15.1,16.15,17.57,13.93,13.82,13.36,11.12,11.88,12.84,15.75,19.95,20.25,21.48,32.23,47.55,47.11,49.28,49.08,23.64,18.78,15.13,16.52,15.69,12.32,12.77,9.67,9.91,10.0,7.76,6.7,8.74,9.84,10.29,11.64,11.89,9.53,8.8,8.49,7.58,5.91,11.49,12.93,13.38,14.34,15.32,12.87,14.26,15.09,14.15,13.31,12.32,8.91,8.83,9.45,8.5,10.49,10.58,13.29,14.19,11.87,12.89,13.85,12.43,13.45,14.69,18.32,19.88,18.68,17.8,11.61,10.61,11.35,10.58,10.17,13.22,15.36,16.51,16.69,17.32,14.73,11.64,10.15,12.16,12.89],"rank":[43.3,30.3,26.3,24.8,20.0,19.3,16.1,10.5,10.8,20.6,8.0,22.3,11.3,7.8,4.6,4.9,7.5,8.0,20.6,20.3,19.8,31.2,21.6,17.6,18.0,16.8,9.6,6.1,14.3,5.2,26.8,27.0,28.0,33.8,30.1,13.9,8.7,15.2,22.9,20.9,14.8,9.3,2.7,1.2,0.2,0.2,1.4,4.4,8.5,4.4,4.0,11.3,19.0,7.8,4.3,23.1,55.9,30.1,16.4,42.5,100.0,100.0,72.4,76.6,75.9,49.6,42.3,37.4,34.3,36.1,23.1,28.6,23.4,22.4,18.2,34.5,33.1,32.6,22.7,22.1,19.9,20.1,18.2,15.0,14.8,15.5,16.1,27.0,21.5,20.1,20.9,22.6,18.9,22.3,22.5,37.2,18.7,16.2,17.1,12.4,12.3,15.9,13.4,13.4,15.1,13.4,17.3,11.9,28.1,10.4,9.1,7.6,12.7,7.5,1.1,3.7,0.0,0.0,0.0,0.0,4.4,9.6,1.8,10.4,15.9,2.1,0.7,0.0,20.5,0.0,0.0,4.4,13.4,8.4,12.6,4.3,1.5,13.8,5.2,5.3,23.3,22.8,10.6,23.9,14.7,4.9,1.7,5.4,6.6,5.8,13.1,61.3,70.5,16.6,29.5,13.3,10.0,16.9,18.8,62.3,74.6,48.4,72.9,75.2,74.2,92.7,73.4,41.3,27.1,21.5,28.7,35.9,61.6,85.8,70.8,64.6,67.3,50.0,45.6,59.4,75.2,57.0,54.5,44.9,43.0,37.4,29.5,28.6,21.1,26.1,49.2,48.8,36.3,52.7,69.5,77.5,76.3,79.3,68.3,49.9,41.0,30.9,32.8,19.6,12.4,31.4,30.3,21.5,25.5,18.6,0.0,8.3,0.9,2.5,14.3,11.6,20.5,3.3,41.1,45.3,22.9,4.9,3.1,0.0,1.7,0.0,7.4,6.9,5.6,11.9,0.0,0.9,0.0,2.6,3.3,9.3,2.1,3.3,2.0,20.2,9.3,21.2,13.4,0.9,4.5,4.7,21.0,22.6,22.2,33.9,51.8,58.0,15.3,9.9,7.2,0.0,1.2,0.0,1.5,6.6,2.6,8.9,4.4,8.5,8.2,12.3,6.0,15.0,11.6,7.2,18.5,17.4,9.4,9.8,41.1,54.4,68.9,30.7,14.7,5.0,0.0,0.7,10.8,3.7,8.1,13.6,5.9,6.3,6.1,47.3,46.0,100.0,31.9,11.0,15.0,11.8,39.4,17.6,16.1,19.1,27.5,32.2,23.1,31.7,37.5,11.5,16.0,12.7,6.2,3.4,7.3,24.3,15.3,16.0,28.8,15.4,11.2,17.1,17.5,10.9,23.8,29.1,43.1,37.1,27.8,36.7,100.0,63.5,44.0,32.1,26.7,24.8,13.3,25.6,16.4,12.0,22.0,21.3,10.6,10.8,9.9,9.2,5.5,19.2,6.0,5.9,3.7,6.5,6.1,5.0,6.8,6.4,9.8,22.5,20.2,9.1,11.8,16.0,17.8,26.9,9.0,6.7,5.6,1.8,0.3,2.7,2.6,6.2,6.7,10.2,17.8,18.3,14.5,16.4,41.2,35.3,34.3,45.2,26.8,21.1,19.7,29.8,20.0,21.2,28.2,18.4,10.5,45.7,23.9,16.7,28.1,15.2,8.9,30.1,29.1,14.3,12.3]};
+
+  var BACKTEST = {"50":{"pre":{"n":23,"win":0.8260869565217391,"sharpe":1.1814829665175133,"sortino":1.6251945192463753,"worst":-5158.141887066338},"post":{"n":48,"win":0.7708333333333334,"sharpe":0.4847886493898799,"sortino":0.6266931385835913,"worst":-22588.575015165912}},"70":{"pre":{"n":12,"win":0.9166666666666666,"sharpe":1.0861346782900916,"sortino":1.4515936458020116,"worst":-6080.558158276678},"post":{"n":24,"win":0.8333333333333334,"sharpe":0.7163281095431481,"sortino":1.1983144168312851,"worst":-13373.532929083682}},"80":{"pre":{"n":10,"win":0.9,"sharpe":0.8199437291356432,"sortino":1.1018014797895488,"worst":-6080.558158276678},"post":{"n":18,"win":0.6666666666666666,"sharpe":0.3840273656398046,"sortino":0.6187205738214322,"worst":-13373.532929083682}}};
+
+  // Filled in by scripts/regenerate_visual_guide.py on every scheduled refresh.
+  var META = {"generated_at":"2026-08-03","backtest_start":"2005-01-01","backtest_end":"2026-08-04"};
+
+  var css = getComputedStyle(document.documentElement);
+  function tok(name) { return css.getPropertyValue(name).trim(); }
+
+  function fmtPct(x) { return (x * 100).toFixed(0) + "%"; }
+  function fmtUsd(x) { return (x < 0 ? "-$" : "$") + Math.abs(Math.round(x)).toLocaleString(); }
+
+  var svgNS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs) {
+    var e = document.createElementNS(svgNS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  // ---------------- Chart 1: VRP line chart (VIX vs RV, filled gap) ----------------
+  function renderVRPChart() {
+    var svg = document.getElementById("vrp-chart");
+    var tooltip = document.getElementById("vrp-tooltip");
+    var wrap = document.getElementById("vrp-chart-wrap");
+    var W = 960, H = 340, padL = 34, padR = 8, padT = 12, padB = 26;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+
+    var n = DATA.dates.length;
+    var allVals = DATA.vix.concat(DATA.rv);
+    var yMax = Math.ceil(Math.max.apply(null, allVals) / 10) * 10;
+    var yMin = 0;
+
+    function x(i) { return padL + (i / (n - 1)) * plotW; }
+    function y(v) { return padT + plotH - ((v - yMin) / (yMax - yMin)) * plotH; }
+
+    // gridlines + y labels
+    var steps = 4;
+    for (var s = 0; s <= steps; s++) {
+      var v = yMin + (yMax - yMin) * (s / steps);
+      var gy = y(v);
+      svg.appendChild(el("line", { x1: padL, x2: W - padR, y1: gy, y2: gy, class: "grid-line" }));
+      var lbl = el("text", { x: 4, y: gy + 3, class: "axis-label" });
+      lbl.textContent = Math.round(v);
+      svg.appendChild(lbl);
+    }
+    // x labels (years)
+    var seenYears = {};
+    for (var i = 0; i < n; i++) {
+      var yr = DATA.dates[i].slice(0, 4);
+      if (!seenYears[yr]) {
+        seenYears[yr] = true;
+        var lx = el("text", { x: x(i), y: H - 6, class: "axis-label", "text-anchor": "start" });
+        lx.textContent = yr;
+        svg.appendChild(lx);
+      }
+    }
+
+    function pathFor(vals) {
+      var d = "";
+      for (var i = 0; i < n; i++) d += (i === 0 ? "M" : "L") + x(i) + "," + y(vals[i]) + " ";
+      return d;
+    }
+
+    // filled gap area (between vix and rv)
+    var areaD = "M" + x(0) + "," + y(DATA.vix[0]) + " ";
+    for (var i = 1; i < n; i++) areaD += "L" + x(i) + "," + y(DATA.vix[i]) + " ";
+    for (var i = n - 1; i >= 0; i--) areaD += "L" + x(i) + "," + y(DATA.rv[i]) + " ";
+    areaD += "Z";
+    svg.appendChild(el("path", { d: areaD, fill: tok("--gold-bright"), opacity: "0.16", stroke: "none" }));
+
+    svg.appendChild(el("path", { d: pathFor(DATA.rv), fill: "none", stroke: tok("--calm-bright"), "stroke-width": "2" }));
+    svg.appendChild(el("path", { d: pathFor(DATA.vix), fill: "none", stroke: tok("--risk-bright"), "stroke-width": "2" }));
+
+    // interaction layer
+    var crosshair = el("line", { class: "crosshair", y1: padT, y2: padT + plotH, x1: -100, x2: -100 });
+    svg.appendChild(crosshair);
+    var dotVix = el("circle", { r: "4", fill: tok("--risk-bright"), stroke: tok("--paper-raised"), "stroke-width": "1.5" });
+    var dotRv = el("circle", { r: "4", fill: tok("--calm-bright"), stroke: tok("--paper-raised"), "stroke-width": "1.5" });
+    dotVix.style.display = "none"; dotRv.style.display = "none";
+    svg.appendChild(dotVix); svg.appendChild(dotRv);
+
+    var hitRect = el("rect", { x: padL, y: padT, width: plotW, height: plotH, fill: "transparent" });
+    svg.appendChild(hitRect);
+
+    function onMove(evt) {
+      var rect = svg.getBoundingClientRect();
+      var mx = ((evt.clientX - rect.left) / rect.width) * W;
+      var idx = Math.round(((mx - padL) / plotW) * (n - 1));
+      idx = Math.max(0, Math.min(n - 1, idx));
+      var px = x(idx);
+      crosshair.setAttribute("x1", px); crosshair.setAttribute("x2", px);
+      dotVix.setAttribute("cx", px); dotVix.setAttribute("cy", y(DATA.vix[idx])); dotVix.style.display = "";
+      dotRv.setAttribute("cx", px); dotRv.setAttribute("cy", y(DATA.rv[idx])); dotRv.style.display = "";
+
+      var gap = (DATA.vix[idx] - DATA.rv[idx]).toFixed(1);
+      tooltip.innerHTML = DATA.dates[idx] + "<br>VIX: " + DATA.vix[idx].toFixed(1) + " &nbsp;RV: " + DATA.rv[idx].toFixed(1) + "<br>gap: " + gap;
+      var wrapRect = wrap.getBoundingClientRect();
+      var tx = ((px / W) * rect.width);
+      tooltip.style.left = tx + "px";
+      tooltip.style.top = ((y(Math.max(DATA.vix[idx], DATA.rv[idx])) / H) * rect.height) + "px";
+      tooltip.classList.add("visible");
+    }
+    function onLeave() {
+      crosshair.setAttribute("x1", -100); crosshair.setAttribute("x2", -100);
+      dotVix.style.display = "none"; dotRv.style.display = "none";
+      tooltip.classList.remove("visible");
+    }
+    hitRect.addEventListener("mousemove", onMove);
+    hitRect.addEventListener("mouseleave", onLeave);
+    hitRect.addEventListener("touchmove", function (e) { onMove(e.touches[0]); }, { passive: true });
+    hitRect.addEventListener("touchend", onLeave);
+  }
+
+  // ---------------- Chart 2: IV rank chart with threshold bands ----------------
+  function renderRankChart() {
+    var svg = document.getElementById("rank-chart");
+    var tooltip = document.getElementById("rank-tooltip");
+    var wrap = document.getElementById("rank-chart-wrap");
+    var W = 960, H = 300, padL = 30, padR = 8, padT = 12, padB = 26;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    var n = DATA.dates.length;
+
+    function x(i) { return padL + (i / (n - 1)) * plotW; }
+    function y(v) { return padT + plotH - (v / 100) * plotH; }
+
+    [0, 25, 50, 75, 100].forEach(function (v) {
+      var gy = y(v);
+      svg.appendChild(el("line", { x1: padL, x2: W - padR, y1: gy, y2: gy, class: "grid-line" }));
+      var lbl = el("text", { x: 2, y: gy + 3, class: "axis-label" });
+      lbl.textContent = v;
+      svg.appendChild(lbl);
+    });
+
+    var seenYears = {};
+    for (var i = 0; i < n; i++) {
+      var yr = DATA.dates[i].slice(0, 4);
+      if (!seenYears[yr]) {
+        seenYears[yr] = true;
+        var lx = el("text", { x: x(i), y: H - 6, class: "axis-label" });
+        lx.textContent = yr;
+        svg.appendChild(lx);
+      }
+    }
+
+    [50, 70, 80].forEach(function (thresh) {
+      var ty = y(thresh);
+      svg.appendChild(el("line", { x1: padL, x2: W - padR, y1: ty, y2: ty, stroke: tok("--ink-muted"), "stroke-width": "1", "stroke-dasharray": "2 3", opacity: "0.7" }));
+      var tl = el("text", { x: W - padR, y: ty - 4, class: "axis-label", "text-anchor": "end" });
+      tl.textContent = thresh;
+      svg.appendChild(tl);
+    });
+
+    var d = "";
+    for (var i = 0; i < n; i++) d += (i === 0 ? "M" : "L") + x(i) + "," + y(DATA.rank[i]) + " ";
+    var areaD = d + "L" + x(n - 1) + "," + y(0) + " L" + x(0) + "," + y(0) + " Z";
+    svg.appendChild(el("path", { d: areaD, fill: tok("--gold-bright"), opacity: "0.1", stroke: "none" }));
+    svg.appendChild(el("path", { d: d, fill: "none", stroke: tok("--gold-bright"), "stroke-width": "2" }));
+
+    var crosshair = el("line", { class: "crosshair", y1: padT, y2: padT + plotH, x1: -100, x2: -100 });
+    svg.appendChild(crosshair);
+    var dot = el("circle", { r: "4", fill: tok("--gold-bright"), stroke: tok("--paper-raised"), "stroke-width": "1.5" });
+    dot.style.display = "none";
+    svg.appendChild(dot);
+    var hitRect = el("rect", { x: padL, y: padT, width: plotW, height: plotH, fill: "transparent" });
+    svg.appendChild(hitRect);
+
+    function onMove(evt) {
+      var rect = svg.getBoundingClientRect();
+      var mx = ((evt.clientX - rect.left) / rect.width) * W;
+      var idx = Math.round(((mx - padL) / plotW) * (n - 1));
+      idx = Math.max(0, Math.min(n - 1, idx));
+      var px = x(idx);
+      crosshair.setAttribute("x1", px); crosshair.setAttribute("x2", px);
+      dot.setAttribute("cx", px); dot.setAttribute("cy", y(DATA.rank[idx])); dot.style.display = "";
+      tooltip.innerHTML = DATA.dates[idx] + "<br>rank: " + DATA.rank[idx].toFixed(1);
+      var rect2 = svg.getBoundingClientRect();
+      tooltip.style.left = ((px / W) * rect2.width) + "px";
+      tooltip.style.top = ((y(DATA.rank[idx]) / H) * rect2.height) + "px";
+      tooltip.classList.add("visible");
+    }
+    function onLeave() {
+      crosshair.setAttribute("x1", -100); crosshair.setAttribute("x2", -100);
+      dot.style.display = "none";
+      tooltip.classList.remove("visible");
+    }
+    hitRect.addEventListener("mousemove", onMove);
+    hitRect.addEventListener("mouseleave", onLeave);
+    hitRect.addEventListener("touchmove", function (e) { onMove(e.touches[0]); }, { passive: true });
+    hitRect.addEventListener("touchend", onLeave);
+  }
+
+  // ---------------- Chart 3: grouped bar chart (Sharpe by threshold x regime) ----------------
+  function renderBarChart() {
+    var svg = document.getElementById("bar-chart");
+    var tooltip = document.getElementById("bar-tooltip");
+    var W = 960, H = 300, padL = 34, padR = 8, padT = 16, padB = 30;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    var thresholds = ["50", "70", "80"];
+    var maxSharpe = 1.3;
+
+    function y(v) { return padT + plotH - (v / maxSharpe) * plotH; }
+    var zeroY = y(0);
+    svg.appendChild(el("line", { x1: padL, x2: W - padR, y1: zeroY, y2: zeroY, class: "grid-line" }));
+    [0, 0.4, 0.8, 1.2].forEach(function (v) {
+      var gy = y(v);
+      svg.appendChild(el("line", { x1: padL, x2: W - padR, y1: gy, y2: gy, class: "grid-line" }));
+      var lbl = el("text", { x: 2, y: gy + 3, class: "axis-label" });
+      lbl.textContent = v.toFixed(1);
+      svg.appendChild(lbl);
+    });
+
+    var groupW = plotW / thresholds.length;
+    var barW = groupW * 0.22;
+
+    thresholds.forEach(function (t, gi) {
+      var groupCenter = padL + groupW * gi + groupW / 2;
+      var lbl = el("text", { x: groupCenter, y: H - 8, class: "axis-label", "text-anchor": "middle" });
+      lbl.textContent = "> " + t;
+      svg.appendChild(lbl);
+
+      [{ key: "pre", color: tok("--regime-pre"), label: "Pre-2010" }, { key: "post", color: tok("--regime-post"), label: "Post-2010" }].forEach(function (regime, ri) {
+        var val = BACKTEST[t][regime.key].sharpe;
+        var bx = groupCenter - barW - 4 + ri * (barW + 8);
+        var by = y(Math.max(val, 0));
+        var bh = Math.abs(y(val) - zeroY);
+        var rect = el("rect", { x: bx, y: by, width: barW, height: Math.max(bh, 1), fill: regime.color, rx: "2" });
+        rect.style.cursor = "pointer";
+        svg.appendChild(rect);
+
+        rect.addEventListener("mousemove", function (evt) {
+          var rect2 = svg.getBoundingClientRect();
+          tooltip.innerHTML = "threshold &gt; " + t + " &middot; " + regime.label + "<br>Sharpe: " + val.toFixed(2) +
+            "<br>n=" + BACKTEST[t][regime.key].n + " trades &middot; win rate " + fmtPct(BACKTEST[t][regime.key].win);
+          tooltip.style.left = ((bx + barW / 2) / W) * rect2.width + "px";
+          tooltip.style.top = (by / H) * rect2.height + "px";
+          tooltip.classList.add("visible");
+        });
+        rect.addEventListener("mouseleave", function () { tooltip.classList.remove("visible"); });
+      });
+    });
+  }
+
+  function fillResultsTable() {
+    var tbody = document.querySelector("#results-table tbody");
+    var thresholds = ["50", "70", "80"];
+    thresholds.forEach(function (t) {
+      ["pre", "post"].forEach(function (regime) {
+        var d = BACKTEST[t][regime];
+        var tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>&gt; " + t + "</td>" +
+          "<td>" + (regime === "pre" ? "Pre-2010" : "Post-2010") + "</td>" +
+          "<td>" + d.n + "</td>" +
+          "<td>" + fmtPct(d.win) + "</td>" +
+          "<td>" + d.sharpe.toFixed(2) + "</td>" +
+          "<td>" + d.sortino.toFixed(2) + "</td>" +
+          "<td>" + fmtUsd(d.worst) + "</td>";
+        tbody.appendChild(tr);
+      });
+    });
+  }
+
+  // ---------------- Iron condor payoff diagram ----------------
+  function renderPayoffChart() {
+    var svg = document.getElementById("payoff-chart");
+    var tooltip = document.getElementById("payoff-tooltip");
+    var W = 960, H = 320;
+    var padL = 60, padR = 60, padT = 30, padB = 50;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+
+    // strikes (illustrative, x-axis positions 0..1 across the plot)
+    var longPutX = 0.10, shortPutX = 0.32, spotX = 0.5, shortCallX = 0.68, longCallX = 0.90;
+    var maxProfitY = padT + plotH * 0.22;
+    var maxLossY = padT + plotH * 0.88;
+    var zeroY = padT + plotH * 0.55;
+
+    function xPix(f) { return padL + f * plotW; }
+
+    // baseline (breakeven-ish zero line)
+    svg.appendChild(el("line", { x1: padL, x2: W - padR, y1: zeroY, y2: zeroY, class: "grid-line" }));
+
+    var pts = [
+      [0, maxLossY],
+      [longPutX, maxLossY],
+      [shortPutX, maxProfitY],
+      [shortCallX, maxProfitY],
+      [longCallX, maxLossY],
+      [1, maxLossY]
+    ];
+    var d = "M";
+    pts.forEach(function (p, i) { d += (i === 0 ? "" : "L") + xPix(p[0]) + "," + p[1] + " "; });
+
+    // fill: profit zone (between short strikes) vs loss zones (wings)
+    var profitFillD = "M" + xPix(shortPutX) + "," + maxProfitY + " L" + xPix(shortCallX) + "," + maxProfitY +
+      " L" + xPix(shortCallX) + "," + zeroY + " L" + xPix(shortPutX) + "," + zeroY + " Z";
+    svg.appendChild(el("path", { d: profitFillD, fill: tok("--good"), opacity: "0.14" }));
+
+    var lossFillLeftD = "M" + xPix(0) + "," + zeroY + " L" + xPix(0) + "," + maxLossY + " L" + xPix(longPutX) + "," + maxLossY +
+      " L" + xPix(shortPutX) + "," + maxProfitY + " L" + xPix(shortPutX) + "," + zeroY + " Z";
+    var lossFillRightD = "M" + xPix(shortCallX) + "," + zeroY + " L" + xPix(shortCallX) + "," + maxProfitY + " L" + xPix(longCallX) + "," + maxLossY +
+      " L" + xPix(1) + "," + maxLossY + " L" + xPix(1) + "," + zeroY + " Z";
+    svg.appendChild(el("path", { d: lossFillLeftD, fill: tok("--risk"), opacity: "0.12" }));
+    svg.appendChild(el("path", { d: lossFillRightD, fill: tok("--risk"), opacity: "0.12" }));
+
+    svg.appendChild(el("path", { d: d, fill: "none", stroke: tok("--ink"), "stroke-width": "2.5" }));
+
+    // strike markers + labels
+    var strikes = [
+      { x: longPutX, label: "Long put", sub: "~0.05Δ (wing)" },
+      { x: shortPutX, label: "Short put", sub: "~0.20Δ" },
+      { x: shortCallX, label: "Short call", sub: "~0.20Δ" },
+      { x: longCallX, label: "Long call", sub: "~0.05Δ (wing)" }
+    ];
+    strikes.forEach(function (s) {
+      svg.appendChild(el("line", { x1: xPix(s.x), x2: xPix(s.x), y1: padT, y2: maxLossY + 10, stroke: tok("--line-strong"), "stroke-width": "1", "stroke-dasharray": "2 3" }));
+      var t1 = el("text", { x: xPix(s.x), y: maxLossY + 26, class: "strike-label", "text-anchor": "middle" });
+      t1.textContent = s.label;
+      svg.appendChild(t1);
+      var t2 = el("text", { x: xPix(s.x), y: maxLossY + 40, class: "strike-label", "text-anchor": "middle", opacity: "0.7" });
+      t2.textContent = s.sub;
+      svg.appendChild(t2);
+    });
+
+    var spotLine = el("line", { x1: xPix(spotX), x2: xPix(spotX), y1: padT, y2: maxLossY + 10, stroke: tok("--gold"), "stroke-width": "1.5" });
+    svg.appendChild(spotLine);
+    var spotLbl = el("text", { x: xPix(spotX), y: padT - 10, class: "strike-label", "text-anchor": "middle", fill: tok("--gold"), "font-weight": "700" });
+    spotLbl.textContent = "Spot price at entry";
+    svg.appendChild(spotLbl);
+
+    var profitLbl = el("text", { x: xPix((shortPutX + shortCallX) / 2), y: maxProfitY - 12, class: "zone-label", "text-anchor": "middle", "font-weight": "700" });
+    profitLbl.textContent = "Max profit = net credit";
+    svg.appendChild(profitLbl);
+    var lossLbl1 = el("text", { x: xPix((longPutX) / 2), y: maxLossY - 12, class: "zone-label", "text-anchor": "middle" });
+    lossLbl1.textContent = "Max loss (capped)";
+    svg.appendChild(lossLbl1);
+    var lossLbl2 = el("text", { x: xPix((longCallX + 1) / 2), y: maxLossY - 12, class: "zone-label", "text-anchor": "middle" });
+    lossLbl2.textContent = "Max loss (capped)";
+    svg.appendChild(lossLbl2);
+
+    // interactive zones
+    var zones = [
+      { x0: 0, x1: longPutX, name: "Below the long put", desc: "Loss is fully capped here — the long put's gain offsets further short-put losses 1:1." },
+      { x0: longPutX, x1: shortPutX, name: "Put wing", desc: "Losing money, but by less than the max — this is where the long put starts kicking in." },
+      { x0: shortPutX, x1: shortCallX, name: "Profit zone", desc: "Both short strikes finish out of the money. All four legs expire worthless — you keep the full credit." },
+      { x0: shortCallX, x1: longCallX, name: "Call wing", desc: "Losing money, but by less than the max — the long call starts offsetting the short call." },
+      { x0: longCallX, x1: 1, name: "Above the long call", desc: "Loss is fully capped here too — symmetric to the put side." }
+    ];
+    zones.forEach(function (z) {
+      var rect = el("rect", { x: xPix(z.x0), y: padT, width: xPix(z.x1) - xPix(z.x0), height: plotH, fill: "transparent", class: "zone", tabindex: "0" });
+      rect.addEventListener("mousemove", function (evt) {
+        var rect2 = svg.getBoundingClientRect();
+        tooltip.innerHTML = "<strong>" + z.name + "</strong><br>" + z.desc;
+        tooltip.style.whiteSpace = "normal";
+        tooltip.style.maxWidth = "220px";
+        tooltip.style.left = (((xPix(z.x0) + xPix(z.x1)) / 2 / W) * rect2.width) + "px";
+        tooltip.style.top = (((padT + 20) / H) * rect2.height) + "px";
+        tooltip.classList.add("visible");
+      });
+      rect.addEventListener("mouseleave", function () { tooltip.classList.remove("visible"); });
+      svg.appendChild(rect);
+    });
+  }
+
+  // ---------------- dynamic prose: every derived number/date in the copy is
+  // computed here from DATA/BACKTEST/META at render time, never hardcoded --
+  // so a data refresh can never leave the prose contradicting the charts. ----
+  function fmtMonYear(dateStr) {
+    var d = new Date(dateStr + "T00:00:00Z");
+    var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return months[d.getUTCMonth()] + " " + d.getUTCFullYear();
+  }
+
+  function populateDynamicText() {
+    var n = DATA.dates.length;
+    var meanVix = DATA.vix.reduce(function (a, b) { return a + b; }, 0) / n;
+    var meanRv = DATA.rv.reduce(function (a, b) { return a + b; }, 0) / n;
+    var pctAbove = (DATA.vix.filter(function (v, i) { return v > DATA.rv[i]; }).length / n) * 100;
+
+    document.getElementById("vrp-date-range").textContent = fmtMonYear(DATA.dates[0]) + " – " + fmtMonYear(DATA.dates[n - 1]);
+    document.getElementById("week-count").textContent = n;
+    document.getElementById("mean-vix").textContent = meanVix.toFixed(1);
+    document.getElementById("mean-rv").textContent = meanRv.toFixed(1);
+    document.getElementById("pct-weeks-above").textContent = pctAbove.toFixed(1) + "%";
+    document.getElementById("data-asof").textContent = META.generated_at;
+    document.getElementById("backtest-window").textContent =
+      new Date(META.backtest_start + "T00:00:00Z").getUTCFullYear() + "–" + new Date(META.backtest_end + "T00:00:00Z").getUTCFullYear();
+
+    var worstVals = [];
+    Object.keys(BACKTEST).forEach(function (t) {
+      ["pre", "post"].forEach(function (r) { worstVals.push(Math.abs(BACKTEST[t][r].worst)); });
+    });
+    var lo = Math.min.apply(null, worstVals), hi = Math.max.apply(null, worstVals);
+    document.getElementById("worst-trade-range").textContent = "$" + Math.round(lo).toLocaleString() + "–$" + Math.round(hi).toLocaleString();
+
+    var thresholds = Object.keys(BACKTEST);
+    var deltas = thresholds.map(function (t) {
+      return { t: t, pre: BACKTEST[t].pre.sharpe, post: BACKTEST[t].post.sharpe, delta: BACKTEST[t].pre.sharpe - BACKTEST[t].post.sharpe };
+    });
+    var positiveCount = deltas.filter(function (d) { return d.delta > 0; }).length;
+    var biggest = deltas.reduce(function (a, b) { return Math.abs(b.delta) > Math.abs(a.delta) ? b : a; });
+    var patternEl = document.getElementById("pattern-text");
+
+    if (positiveCount === thresholds.length) {
+      patternEl.innerHTML = "At every threshold tested, Sharpe is higher pre-2010 than post-2010 (e.g. threshold&gt;" + biggest.t +
+        ": <strong>" + biggest.pre.toFixed(2) + "</strong> vs. <strong>" + biggest.post.toFixed(2) + "</strong>). That's not noise — " +
+        "it's the exact crowding/decay pattern the literature review predicted (CBOE's own CNDR index shows the same shape). " +
+        "Seeing your own backtest reproduce a documented, independent finding is a good sign the pipeline is measuring something real, not an artifact of the code.";
+    } else if (positiveCount >= Math.ceil(thresholds.length / 2)) {
+      patternEl.innerHTML = "At most thresholds tested, Sharpe is higher pre-2010 than post-2010 (most notably at threshold&gt;" + biggest.t +
+        ": <strong>" + biggest.pre.toFixed(2) + "</strong> vs. <strong>" + biggest.post.toFixed(2) + "</strong>). That lines up with the " +
+        "crowding/decay pattern the literature review predicted, though it isn't universal across every threshold in this run.";
+    } else {
+      patternEl.innerHTML = "The pre- vs. post-2010 comparison is mixed across the three thresholds tested this run, not uniformly showing " +
+        "the crowding/decay pattern the literature review predicted. Worth digging into threshold-by-threshold rather than treating it as one clean signal.";
+    }
+  }
+
+  // ---------------- scroll-spy nav ----------------
+  function initScrollSpy() {
+    var links = Array.prototype.slice.call(document.querySelectorAll(".topnav a.section-link"));
+    var sections = links.map(function (l) { return document.querySelector(l.getAttribute("href")); });
+    function onScroll() {
+      var pos = window.scrollY + 100;
+      var active = 0;
+      sections.forEach(function (s, i) { if (s && s.offsetTop <= pos) active = i; });
+      links.forEach(function (l, i) { l.classList.toggle("active", i === active); });
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+  }
+
+  renderVRPChart();
+  renderRankChart();
+  renderBarChart();
+  renderPayoffChart();
+  fillResultsTable();
+  populateDynamicText();
+  initScrollSpy();
+})();
+</script>
