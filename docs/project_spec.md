@@ -58,7 +58,10 @@ selling beat both the market and unconditional selling, 1990–2018).
 
 ## 6. Data
 
-- **Live/paper execution and current chain data (greeks, IV):** Alpaca Trading API — commission-free, supports multi-leg options orders, and paper environment now includes SPX index options.
+- **Paper execution and current chain data (greeks, IV): thinkorswim paperMoney** (Schwab). *Changed from Alpaca 2026-08-03.*
+  - **No API — orders are entered by hand.** The Schwab Trader API that replaced TD Ameritrade's supports live funded accounts only and cannot place paperMoney orders (verified 2026-08-03). `src/execution/manual_ticket.py` therefore generates order tickets and reconciles fills; it does not, and cannot, submit orders.
+  - **This is a net gain for the research, not just a constraint.** thinkorswim displays live per-strike IV and real bid/ask, which are precisely the two quantities this project currently has to assume: the **volatility skew** the flat-VIX proxy cannot model (§7), and the **real 4-leg spread cost** behind the 10% slippage assumption. Both become directly observable at fill time.
+  - **Cost model needs re-verification.** Schwab charges a per-contract options commission where Alpaca did not, so `backtest.cost_per_contract_usd` likely now understates true cost. Flagged in `config/params.yaml`; not silently adjusted.
 - **Historical options chain data for backtesting:** this is the known gap. Full historical SPX chains are the expensive part of this project. Plan:
   1. Start with a **VIX/realized-volatility proxy** to validate the IV-rank timing signal directionally before paying for anything.
   2. Evaluate a proper historical options data provider only once the signal shows enough promise on the proxy to justify the cost.
@@ -107,7 +110,7 @@ Paper trade the **loosest threshold (>50) only**, tagging each trade with its en
 
 **What the paper phase actually tests (all must pass):**
 
-1. **Execution works end-to-end.** 4-leg orders submit, fill, and settle without manual intervention.
+1. **Execution works end-to-end.** 4-leg orders can actually be entered, filled, and settled as a single spread order. *(Manual entry — thinkorswim paperMoney has no API; see §6. The criterion is that the trade is executable at all, not that it is automated.)*
 2. **Fills match the model.** Median realized slippage stays within the modeled 10% haircut on net credit.
 3. **Signal fidelity.** The live signal fires on the dates the backtest says it would, given the same data.
 4. **Sim-to-live reconciliation.** Each closed trade's realized P&L matches what the pricing model predicts given the actual settlement price. *(This is the step most often skipped; persistent divergence means the simulator is wrong, which would make every backtest run through it suspect.)*

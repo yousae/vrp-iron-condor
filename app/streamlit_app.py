@@ -271,7 +271,7 @@ def main() -> None:
             {"Stage": "Pricing", "File": "pricing.py", "Status": "Built"},
             {"Stage": "Backtest", "File": "engine.py", "Status": "Built"},
             {"Stage": "Risk", "File": "sizing.py", "Status": "Stub"},
-            {"Stage": "Execution", "File": "alpaca_client.py", "Status": "Stub"},
+            {"Stage": "Execution", "File": "manual_ticket.py", "Status": "Built"},
             {"Stage": "Decision", "File": "go / no-go", "Status": "Not started"},
         ])
         status_color = {"Built": GOOD, "Stub": GOLD, "Not started": INK_MUTED}

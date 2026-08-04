@@ -21,7 +21,7 @@ cd vrp-iron-condor
 python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env       # then fill in your Alpaca paper API keys
+cp .env.example .env       # no credentials needed today -- see the file
 ```
 
 ## Project structure
@@ -33,7 +33,7 @@ src/data/          data ingestion (VIX/RV proxy first, options chain provider la
 src/signals/       IV rank and entry signal logic
 src/risk/          position sizing (fractional Kelly, fixed-risk caps)
 src/backtest/      backtest engine
-src/execution/     Alpaca API integration for paper/live trading
+src/execution/     manual order tickets + fill reconciliation (thinkorswim paperMoney)
 tests/             unit tests
 ```
 

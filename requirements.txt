@@ -4,7 +4,6 @@ scipy
 matplotlib
 pyyaml
 python-dotenv
-alpaca-py
 yfinance
 pytest
 streamlit
