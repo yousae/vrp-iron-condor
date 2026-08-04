@@ -52,6 +52,13 @@ tests/             unit tests
 
 ## Running it
 
+Activate the virtual environment first — every command below needs it, and
+without it you'll get `ModuleNotFoundError: No module named 'yaml'`:
+
+```bash
+source venv/bin/activate          # your prompt should now start with (venv)
+```
+
 ```bash
 python3 -m src.execution.runner --check          # read-only: connectivity, paper endpoint, options level
 python3 -m src.execution.runner --plumbing-test  # ONE flagged test order, bypasses the signal
