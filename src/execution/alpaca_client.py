@@ -125,6 +125,16 @@ def get_client(paper: bool = True):
 
     import os
 
+    # Load .env if present. Without this, keys placed in .env are silently
+    # ignored and the error below is misleading ("not found in environment"
+    # when they are plainly sitting in the file the docs told you to fill).
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+    except ImportError:
+        pass
+
     api_key = os.environ.get("ALPACA_API_KEY")
     secret_key = os.environ.get("ALPACA_SECRET_KEY")
     if not api_key or not secret_key:
@@ -136,6 +146,61 @@ def get_client(paper: bool = True):
     from alpaca.trading.client import TradingClient
 
     return TradingClient(api_key, secret_key, paper=True)
+
+
+REQUIRED_OPTIONS_LEVEL = 3  # multi-leg spreads need Level 3 on Alpaca
+
+
+def preflight(client) -> dict:
+    """Read-only account check. Places nothing.
+
+    Run this before the first order. It answers the questions that would
+    otherwise surface as a confusing rejection: is the account reachable,
+    is it actually the paper account, is options approval high enough for
+    a 4-leg spread, and is anything blocked.
+    """
+    assert_paper_client(client)
+    acct = client.get_account()
+
+    approved = getattr(acct, "options_approved_level", None)
+    trading = getattr(acct, "options_trading_level", None)
+    effective = min([lvl for lvl in (approved, trading) if lvl is not None], default=None)
+
+    return {
+        "account_number": getattr(acct, "account_number", None),
+        "status": str(getattr(acct, "status", None)),
+        "is_paper": True,  # assert_paper_client would have raised otherwise
+        "options_approved_level": approved,
+        "options_trading_level": trading,
+        "options_level_sufficient": effective is not None and effective >= REQUIRED_OPTIONS_LEVEL,
+        "equity": getattr(acct, "equity", None),
+        "options_buying_power": getattr(acct, "options_buying_power", None),
+        "account_blocked": getattr(acct, "account_blocked", None),
+        "trading_blocked": getattr(acct, "trading_blocked", None),
+    }
+
+
+def describe_preflight(info: dict) -> str:
+    """Human-readable preflight summary."""
+    ok = "OK " if info["options_level_sufficient"] else "!! "
+    lines = [
+        f"  account:            {info['account_number']}  ({info['status']})",
+        f"  endpoint:           PAPER (verified)",
+        f"  equity:             {info['equity']}",
+        f"  options buying pwr: {info['options_buying_power']}",
+        f"{ok}options level:      approved={info['options_approved_level']} "
+        f"trading={info['options_trading_level']}  (need >= {REQUIRED_OPTIONS_LEVEL} for 4-leg spreads)",
+    ]
+    if info["account_blocked"] or info["trading_blocked"]:
+        lines.append(f"!! BLOCKED: account_blocked={info['account_blocked']} "
+                     f"trading_blocked={info['trading_blocked']}")
+    return "\n".join(lines)
+
+
+def get_order(client, order_id):
+    """Fetch a submitted order back, to see status and actual fill."""
+    assert_paper_client(client)
+    return client.get_order_by_id(order_id)
 
 
 def build_condor_order(ticket: Ticket, underlying: str, expiration: date, limit_credit: float | None = None):

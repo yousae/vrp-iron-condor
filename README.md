@@ -53,11 +53,22 @@ tests/             unit tests
 ## Running it
 
 ```bash
-python3 -m src.execution.runner            # dry run: decide + print, submit nothing
-python3 -m src.execution.runner --submit   # actually place the order on Alpaca paper
-streamlit run app/streamlit_app.py         # live dashboard
-python3 -m pytest tests/ -q                # 96 tests
+python3 -m src.execution.runner --check          # read-only: connectivity, paper endpoint, options level
+python3 -m src.execution.runner --plumbing-test  # ONE flagged test order, bypasses the signal
+python3 -m src.execution.runner                  # dry run: decide + print, submit nothing
+python3 -m src.execution.runner --submit         # place the signal-gated order on Alpaca paper
+streamlit run app/streamlit_app.py               # live dashboard
+python3 -m pytest tests/ -q                      # 100 tests
 ```
+
+Run them in that order the first time. `--check` verifies the account before
+anything is placed; `--plumbing-test` verifies the execution path without
+waiting months for the signal (it fires ~3x/year), and is logged as
+`kind: "plumbing_test"` so it can never enter the Phase 5 statistics.
+
+**Live trading is blocked in code**, not just by convention: `get_client()`
+hardcodes the paper endpoint and rejects `paper=False`, and `submit_order()`
+independently re-checks the resolved base URL before every submission.
 
 ## Status
 

@@ -73,10 +73,11 @@ def open_positions(path: Path = DEFAULT_LOG_PATH) -> list[dict]:
     describe what ran.
     """
     settled_ids = {r.get("order_id") for r in read_kind("settled", path)}
-    return [
-        r for r in read_kind("order_submitted", path)
-        if r.get("order_id") not in settled_ids
-    ]
+    # Plumbing tests are tagged separately so they never pollute Phase 5
+    # statistics, but they open a REAL paper position, so they must still
+    # block a second concurrent trade.
+    submitted = read_kind("order_submitted", path) + read_kind("plumbing_test", path)
+    return [r for r in submitted if r.get("order_id") not in settled_ids]
 
 
 if __name__ == "__main__":

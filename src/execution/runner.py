@@ -249,11 +249,139 @@ def run(dry_run: bool = True, config: dict | None = None) -> dict:
     return {"submitted": True, "order": order, **decision}
 
 
+def check_account() -> dict:
+    """Read-only connectivity + approval check. Places nothing."""
+    from src.execution.alpaca_client import describe_preflight, get_client, preflight
+
+    info = preflight(get_client(paper=True))
+    print("PREFLIGHT")
+    print(describe_preflight(info))
+    return info
+
+
+def plumbing_test(config: dict | None = None) -> dict:
+    """Submit ONE deliberately-flagged order to verify the execution path.
+
+    This exists because the signal fires ~3x/year, so waiting for it is a
+    hopeless way to discover that an OCC symbol is malformed or that the
+    limit-price convention is inverted. It bypasses the signal ON PURPOSE.
+
+    Logged as kind="plumbing_test", never "order_submitted", so it can
+    never be counted in Phase 5 trade statistics -- but trade_log's
+    open_positions() does count it, because it opens a real paper
+    position that must block a concurrent signal trade.
+
+    Always 1 contract: the goal is to learn whether the plumbing works,
+    not to take a position.
+    """
+    from src.execution.alpaca_client import (
+        build_condor_order,
+        describe_preflight,
+        get_client,
+        get_order,
+        preflight,
+        submit_order,
+    )
+
+    config = config or load_config()
+    client = get_client(paper=True)
+
+    info = preflight(client)
+    print("PREFLIGHT")
+    print(describe_preflight(info))
+    if not info["options_level_sufficient"]:
+        raise RuntimeError(
+            f"options level too low for a 4-leg spread (need >= 3). "
+            "Raise it in the Alpaca dashboard before retrying."
+        )
+    if info["account_blocked"] or info["trading_blocked"]:
+        raise RuntimeError("account or trading is blocked; resolve in the Alpaca dashboard.")
+
+    open_now = trade_log.open_positions()
+    if open_now:
+        raise RuntimeError(f"{len(open_now)} position(s) already open -- close them first.")
+
+    market = current_market()
+    execution = config["execution"]
+    spot = market["spot_spx"] / 10 if execution["symbol"] == "XSP" else market["spot_spx"]
+    ticket = build_ticket(
+        spot=spot,
+        implied_vol=market["vix"] / 100,
+        risk_free_rate=market["risk_free_rate"],
+        short_delta=config["structure"]["short_delta"],
+        long_delta=config["structure"]["long_delta"],
+        dte_days=config["pricing_proxy"]["dte_trading_days"],
+        contracts=1,
+        wing_width_points=execution["wing_width_points"],
+        strike_increment=execution["strike_increment"],
+    )
+    expiration = next_monthly_expiration(
+        market["as_of"], execution["target_calendar_days_to_expiry"]
+    )
+    limit_credit = round(ticket.modeled_credit_usd / 100, 2)
+
+    print()
+    print(format_ticket(ticket, symbol=execution["symbol"]))
+    print(f"\n  expiration:   {expiration}")
+    print(f"  limit price:  {limit_credit}  (interpreted as a per-spread CREDIT -- "
+          "this is the convention under test)")
+    print("\nSUBMITTING ONE PLUMBING-TEST ORDER...")
+
+    order = submit_order(client, build_condor_order(
+        ticket, execution["symbol"], expiration, limit_credit=limit_credit))
+    order_id = str(getattr(order, "id", "unknown"))
+
+    fetched = get_order(client, order_id)
+    status = str(getattr(fetched, "status", "unknown"))
+    filled_qty = getattr(fetched, "filled_qty", None)
+    filled_price = getattr(fetched, "filled_avg_price", None)
+
+    record = trade_log.append({
+        "kind": "plumbing_test",
+        "order_id": order_id,
+        "as_of": market["as_of"],
+        "symbol": execution["symbol"],
+        "expiration": expiration,
+        "contracts": 1,
+        "limit_credit_submitted": limit_credit,
+        "modeled_credit_usd": round(ticket.modeled_credit_usd, 2),
+        "max_loss_usd": round(ticket.max_loss_usd, 2),
+        "order_status": status,
+        "filled_qty": str(filled_qty) if filled_qty is not None else None,
+        "filled_avg_price": str(filled_price) if filled_price is not None else None,
+        "note": "signal bypassed on purpose; excluded from Phase 5 statistics",
+    })
+
+    print(f"\n  order id:     {order_id}")
+    print(f"  status:       {status}")
+    print(f"  filled qty:   {filled_qty}")
+    print(f"  fill price:   {filled_price}")
+    print("\nWHAT TO CHECK NOW:")
+    print("  1. Do the four legs in the Alpaca dashboard match the ticket above?")
+    print("  2. Is the position SHORT the inner strikes (credit received, not paid)?")
+    print("  3. If filled: is the credit positive and near the modeled value?")
+    print("     A large negative or near-zero fill means the limit convention is inverted.")
+    print("  4. Close the position in the dashboard when done -- it is not a real trade.")
+    return record
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run one paper-trading decision cycle.")
     parser.add_argument("--submit", action="store_true",
                         help="actually submit to Alpaca paper (default is a dry run)")
+    parser.add_argument("--check", action="store_true",
+                        help="read-only preflight: connectivity, paper endpoint, options level")
+    parser.add_argument("--plumbing-test", action="store_true",
+                        help="submit ONE flagged test order, bypassing the signal, to verify "
+                             "symbols and the limit-price convention")
     args = parser.parse_args()
+
+    if args.check:
+        check_account()
+        return
+    if args.plumbing_test:
+        plumbing_test()
+        return
 
     config = load_config()
     result = run(dry_run=not args.submit, config=config)
