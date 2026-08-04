@@ -54,6 +54,14 @@ pricing_proxy:
   risk_free_rate_source: yfinance_IRX   # 13-week T-bill (^IRX), pulled historically
   dte_trading_days: 21                  # approximates the monthly cycle; not actual 3rd-Friday expirations
   contract_multiplier: 100              # standard SPX option multiplier
+  # SENSITIVITY ANALYSIS of the flat-VIX assumption -- NOT a skew correction.
+  # Real SPX puts trade above VIX and calls below it, so flat VIX puts the
+  # short put at the wrong strike. Defaults of 0 reproduce flat-VIX exactly;
+  # set e.g. put +0.03 / call -0.02 to measure how much the bias matters.
+  # See project_spec.md section 7 for the measured magnitude.
+  skew_sensitivity:
+    put_iv_points: 0.0
+    call_iv_points: 0.0
 
 backtest:
   split_regimes: true                # report pre-2010 and post-2010 separately

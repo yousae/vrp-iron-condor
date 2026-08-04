@@ -81,6 +81,36 @@ thinkorswim paperMoney has **no API** — the Schwab Trader API that replaced TD
 - **Model realistic transaction costs and bid-ask slippage**, not mid-price fills. Options spreads are wide; this is where paper backtests most often lie to their authors.
 - **Explicitly check for look-ahead bias** — the IV rank on any given day must only use data available up to that day.
 - **Pre-register the entry threshold sweep** (Section 3) before running it against the full backtest, so results aren't quietly cherry-picked after the fact.
+- **The backtest must trade what the live runner trades.** Both call `build_ticket()` in `src/execution/ticket.py` — same instrument, same wing width, same strike rounding, same risk cap. This was not always true: the backtest previously priced full-size SPX with delta-based wings (median max loss ~$10,900, **5× over** the 2% cap) while the runner traded 1/10-size XSP. The reported Sharpe, win rate, and the `avg_win`/`avg_loss` feeding Kelly all described a strategy that could never have been placed. Sharing one code path makes that class of divergence impossible rather than merely unlikely.
+
+### 7.1 The flat-VIX assumption — measured, not hand-waved
+
+Legs are priced off a single flat VIX with **no volatility skew** (§6). This is the project's largest modelling assumption, so its magnitude is quantified here rather than left as a disclaimer. At spot 760 (XSP), VIX 15.9%, 21 DTE:
+
+| | Modelled (flat VIX) | Realistic (put +3, call −2 vol pts) | Error |
+|---|---|---|---|
+| Short put delta | 0.200 | **0.237** | +18% more risk than intended |
+| Short call delta | 0.200 | **0.166** | −17% less than intended |
+| Short put premium | $398 | $592 | understated ~49% |
+| Short call premium | $381 | $265 | overstated ~44% |
+| Net condor credit | $561 | $591 | **+5%** — the two sides largely offset |
+
+**What this does and does not invalidate:**
+
+- **Win rate and breach frequency are empirically valid.** Payoff is computed against *actual* SPX paths at the chosen strike, not against a modelled probability. A mislabelled delta does not change whether the market actually traded through that strike.
+- **P&L is biased LOW, not merely uncertain.** Flat VIX materially underprices the put side, and the sensitivity run (below) confirms results *improve* under plausible skew. The reported figures are therefore conservative — the assumption is not flattering them.
+- **The "0.20 delta" label is inaccurate.** Effective shorts are ~0.24 delta, so this runs slightly **more aggressively than CNDR's stated methodology**, which matters for benchmark comparability and must be stated when reporting against CNDR.
+
+**Sensitivity run** (post-2010, threshold >50), via `pricing_proxy.skew_sensitivity` in `config/params.yaml`:
+
+| Assumption | n | Win rate | Sharpe | Sortino |
+|---|---|---|---|---|
+| Flat VIX (as reported) | 40 | 80.0% | 0.61 | 0.79 |
+| Mild (put +2, call −1) | 41 | 80.5% | 0.69 | 0.92 |
+| Typical (put +3, call −2) | 41 | 80.5% | 0.70 | 0.93 |
+| Steep (put +5, call −3) | 46 | 82.6% | 0.84 | 1.13 |
+
+**Why no skew correction is applied.** CBOE's SKEW index is free back to 1990 and *is* now fetched and logged at every trade entry (`fetch_skew_history()`), but it is deliberately not used to price anything. SKEW yields a single skewness statistic; reconstructing a smile from it also requires kurtosis, and the standard skewness expansions (Gram-Charlier / Backus-Foresi-Wu) become unreliable at SPX's typical skewness levels. Fitting one anyway would introduce model error to correct model error, while making the output *look* more precise without being more accurate — the exact failure this methodology exists to prevent. The correct fix is real chain data (§6, step 2); this measurement strengthens the case for buying it. Until then the bias is bounded, disclosed, and testable via the sensitivity knob.
 
 ## 8. Benchmarks
 

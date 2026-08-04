@@ -34,7 +34,7 @@ import pandas as pd
 # (python src/backtest/engine.py) or imported from elsewhere
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from src.backtest.pricing import bs_price, strike_from_delta
+from src.execution.ticket import build_ticket
 from src.signals.iv_rank import compute_iv_rank, entry_signal
 
 
@@ -91,6 +91,23 @@ class BacktestEngine:
         cost_per_contract = self.params["backtest"]["cost_per_contract_usd"]
         slippage_pct = self.params["backtest"]["slippage_pct_of_credit"]
 
+        # Backtest the instrument and structure that will ACTUALLY be traded.
+        # Without this the backtest priced full-size SPX with delta-based
+        # wings (median max loss ~$10,900, 5x over the 2% risk cap) while the
+        # runner traded 1/10-size XSP with fixed wings -- so the reported
+        # Sharpe, win rate, and the avg_win/avg_loss feeding Kelly all
+        # described a strategy that would never be placed.
+        execution = self.params.get("execution", {})
+        symbol = execution.get("symbol") or self.params["structure"].get("underlying", "SPX")
+        scale = 0.1 if symbol.upper() == "XSP" else 1.0
+        wing_width = execution.get("wing_width_points")
+        strike_increment = execution.get("strike_increment")
+        skew = self.params.get("pricing_proxy", {}).get("skew_sensitivity", {}) or {}
+        put_iv_adj = skew.get("put_iv_points", 0.0)
+        call_iv_adj = skew.get("call_iv_points", 0.0)
+        risk = self.params.get("risk", {})
+        risk_budget = risk.get("starting_capital_usd", 0) * risk.get("max_risk_per_trade_pct", 0)
+
         iv_rank = compute_iv_rank(vix, lookback_days)
         signal = entry_signal(iv_rank, threshold)
 
@@ -104,31 +121,61 @@ class BacktestEngine:
 
             entry_date = spx.index[i]
             expiration_date = spx.index[i + dte]
-            S0 = float(spx.iloc[i])
-            S_T = float(spx.iloc[i + dte])
+            S0 = float(spx.iloc[i]) * scale
+            S_T = float(spx.iloc[i + dte]) * scale
             sigma = float(vix.iloc[i]) / 100.0
             r = float(risk_free_rate.iloc[i])
-            T = dte / 252.0
 
-            short_put_K = strike_from_delta(S0, T, r, sigma, -short_delta, "put")
-            long_put_K = strike_from_delta(S0, T, r, sigma, -long_delta, "put")
-            short_call_K = strike_from_delta(S0, T, r, sigma, short_delta, "call")
-            long_call_K = strike_from_delta(S0, T, r, sigma, long_delta, "call")
+            # Construct the condor through the SAME function the live runner
+            # uses. Previously this file re-implemented strike selection and
+            # pricing, which let the backtest silently drift into describing
+            # a different strategy than the one that would actually trade --
+            # different instrument, different wing width, different risk per
+            # trade. Sharing one code path makes that divergence impossible.
+            ticket = build_ticket(
+                spot=S0,
+                implied_vol=sigma,
+                risk_free_rate=r,
+                short_delta=short_delta,
+                long_delta=long_delta,
+                dte_days=dte,
+                contracts=1,
+                multiplier=multiplier,
+                wing_width_points=wing_width,
+                strike_increment=strike_increment,
+                put_iv_adjustment=put_iv_adj,
+                call_iv_adjustment=call_iv_adj,
+            )
+            # Apply the same per-trade risk cap the live runner applies. A
+            # trade whose single-contract max loss exceeds the budget is
+            # DECLINED live, so counting it here would credit the backtest
+            # with trades that could never be placed. Sized off the fixed cap
+            # rather than Kelly to avoid circularity (Kelly needs these very
+            # statistics as its input); at current edge estimates half-Kelly
+            # is ~0.21 and the 2% cap binds first anyway.
+            # Size against the worst case at the NET credit actually
+            # collected, not the modeled mid -- a smaller credit means a
+            # larger max loss, so checking the cap against the mid breaches
+            # it by the size of the slippage haircut on every trade.
+            worst_case = ticket.max_loss_at_credit(ticket.modeled_credit_usd * (1 - slippage_pct))
+            contracts = int(risk_budget // worst_case) if risk_budget else 1
+            if contracts < 1:
+                i += 1
+                continue
 
-            short_put_price = bs_price(S0, short_put_K, T, r, sigma, "put")
-            long_put_price = bs_price(S0, long_put_K, T, r, sigma, "put")
-            short_call_price = bs_price(S0, short_call_K, T, r, sigma, "call")
-            long_call_price = bs_price(S0, long_call_K, T, r, sigma, "call")
+            short_put_K = ticket.short_put_strike
+            long_put_K = ticket.long_put_strike
+            short_call_K = ticket.short_call_strike
+            long_call_K = ticket.long_call_strike
 
-            gross_credit = (short_put_price - long_put_price) + (short_call_price - long_call_price)
-            gross_credit_usd = gross_credit * multiplier
+            gross_credit_usd = ticket.modeled_credit_usd * contracts
             net_credit_usd = gross_credit_usd * (1 - slippage_pct)
 
             put_side_loss = max(0.0, short_put_K - S_T) - max(0.0, long_put_K - S_T)
             call_side_loss = max(0.0, S_T - short_call_K) - max(0.0, S_T - long_call_K)
-            loss_usd = (put_side_loss + call_side_loss) * multiplier
+            loss_usd = (put_side_loss + call_side_loss) * multiplier * contracts
 
-            costs_usd = cost_per_contract * 4  # 4 legs
+            costs_usd = cost_per_contract * 4 * contracts  # 4 legs per contract
             pnl = net_credit_usd - loss_usd - costs_usd
 
             self.trades.append(Trade(

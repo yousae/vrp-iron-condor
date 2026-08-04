@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from src.backtest.engine import BacktestEngine
 from src.data.proxy_signal import (
     fetch_risk_free_rate_history,
+    fetch_skew_history,
     fetch_spx_history,
     fetch_vix_history,
 )
@@ -66,12 +67,20 @@ def current_market(as_of: date | None = None) -> dict:
     if iv_rank.empty:
         raise RuntimeError("not enough history to compute IV rank")
 
+    # Logged for context only -- nothing is priced off it. See
+    # fetch_skew_history() and project_spec.md section 7.
+    try:
+        skew = float(fetch_skew_history(SIGNAL_HISTORY_START, end).iloc[-1])
+    except Exception:
+        skew = None
+
     return {
         "as_of": vix.index[-1].date(),
         "spot_spx": float(spx.iloc[-1]),
         "vix": float(vix.iloc[-1]),
         "risk_free_rate": float(rate.iloc[-1]),
         "iv_rank": float(iv_rank.iloc[-1]),
+        "skew": skew,
     }
 
 
@@ -147,12 +156,14 @@ def decide(config: dict, market: dict, edge: dict) -> dict:
         strike_increment=execution["strike_increment"],
     )
 
-    contracts = int(budget // probe.max_loss_usd)
+    slippage = config["backtest"]["slippage_pct_of_credit"]
+    worst_case = probe.max_loss_at_credit(probe.modeled_credit_usd * (1 - slippage))
+    contracts = int(budget // worst_case)
     if contracts < 1:
         return {
             "trade": False,
             "reason": (f"risk budget ${budget:,.0f} < one contract's max loss "
-                       f"${probe.max_loss_usd:,.0f}; cap is binding, not a bug"),
+                       f"${worst_case:,.0f} (at net credit); cap is binding, not a bug"),
         }
 
     ticket = build_ticket(
@@ -193,6 +204,7 @@ def run(dry_run: bool = True, config: dict | None = None) -> dict:
         "as_of": market["as_of"],
         "iv_rank": round(market["iv_rank"], 2),
         "vix": round(market["vix"], 2),
+        "skew": round(market["skew"], 2) if market.get("skew") else None,
         "threshold": config["paper_trading"]["paper_stream_threshold"],
         "fired": decision["trade"],
         "reason": decision["reason"],
@@ -225,6 +237,7 @@ def run(dry_run: bool = True, config: dict | None = None) -> dict:
         "dte_calendar_days": calendar_days_to(expiration, market["as_of"]),
         "contracts": ticket.contracts,
         "iv_rank_at_entry": round(market["iv_rank"], 2),
+        "skew_at_entry": round(market["skew"], 2) if market.get("skew") else None,
         "strikes": {
             "long_put": ticket.long_put_strike, "short_put": ticket.short_put_strike,
             "short_call": ticket.short_call_strike, "long_call": ticket.long_call_strike,

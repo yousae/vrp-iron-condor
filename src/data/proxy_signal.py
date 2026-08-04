@@ -65,6 +65,33 @@ def fetch_risk_free_rate_history(start: str, end: str) -> pd.Series:
     return series
 
 
+def fetch_skew_history(start: str, end: str) -> pd.Series:
+    """Fetch CBOE SKEW index history (^SKEW), available back to 1990.
+
+    SKEW = 100 - 10 * (risk-neutral skewness of 30-day SPX returns), so
+    ~100 means a symmetric distribution and higher values mean a fatter
+    left tail (richer OTM puts).
+
+    This is logged for CONTEXT, not used to price anything. Deriving a
+    full volatility smile from it would need kurtosis too, which SKEW
+    does not provide, and the standard skewness expansions are unreliable
+    at SPX's typical skewness levels -- see project_spec.md section 7.
+    Recording it means the skew regime at each trade's entry is known, so
+    the flat-VIX bias can be bounded after the fact and calibrated
+    properly once real chain data exists.
+    """
+    data = yf.download("^SKEW", start=start, end=end, progress=False, auto_adjust=False)
+    if data.empty:
+        raise ValueError(f"No ^SKEW data returned for {start}..{end}")
+    series = data["Close"]
+    if isinstance(series, pd.DataFrame):
+        series = series.iloc[:, 0]
+    series = series.copy()
+    series.index = series.index.tz_localize(None)
+    series.name = "skew"
+    return series
+
+
 def compute_realized_volatility(prices: pd.Series, window_days: int = 21) -> pd.Series:
     """Rolling annualized realized volatility from a price series.
 

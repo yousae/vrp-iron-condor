@@ -1,9 +1,15 @@
 # SPX volatility risk premium iron condor
 
 A systematic, defined-risk options-selling project: harvest the volatility risk
-premium on SPX index options via IV-rank-timed iron condors, backtest it
-honestly, paper trade it, and — only if it clears a pre-registered bar —
-trade it live with small capital.
+premium on S&P 500 index options via IV-rank-timed iron condors, backtest it
+honestly, and paper trade it. Executed on **XSP** (Mini-SPX — cash-settled,
+European, 1/10 the size of SPX), which is what makes the position small enough
+to respect a 2%-of-capital risk cap.
+
+**Live trading is out of scope.** At the measured trade frequency (~3/year) no
+realistic paper window can produce a statistically meaningful sample, so the
+paper phase validates *execution*, not profitability — see
+[spec §9](docs/project_spec.md) for the power calculation behind that.
 
 Full methodology, rationale, and open parameters: [`docs/project_spec.md`](docs/project_spec.md).
 Supporting academic/institutional research: [`docs/research/vrp_literature_review.md`](docs/research/vrp_literature_review.md).
@@ -11,7 +17,9 @@ If you're working on this with Claude Code, it reads [`CLAUDE.md`](CLAUDE.md) au
 
 ## Current phase
 
-**Phase 2 — data pipeline.** See the spec's milestones table for what's next.
+**Phase 5 — paper trading.** Phases 1–4 are built and tested (96 tests). The
+runner places automated XSP iron condors on Alpaca paper; no live trading, ever
+(that's [out of scope](docs/project_spec.md), and blocked in code).
 
 ## Setup
 
@@ -42,8 +50,38 @@ tests/             unit tests
 - Yousif — engineering (signal, backtest, execution)
 - Carter — market thesis review, trade construction sanity checks, write-up narrative
 
+## Running it
+
+```bash
+python3 -m src.execution.runner            # dry run: decide + print, submit nothing
+python3 -m src.execution.runner --submit   # actually place the order on Alpaca paper
+streamlit run app/streamlit_app.py         # live dashboard
+python3 -m pytest tests/ -q                # 96 tests
+```
+
 ## Status
 
-Everything in `src/` is currently a scaffold — function signatures and TODOs,
-not working code yet. See `config/params.yaml` for the open parameters that
-need to be finalized before the backtest engine gets built out.
+| Stage | Module | State |
+|---|---|---|
+| Data | `src/data/proxy_signal.py` | Built — VIX/SPX/T-bill via yfinance |
+| Signal | `src/signals/iv_rank.py` | Built — 252d trailing IV rank, look-ahead tested |
+| Pricing | `src/backtest/pricing.py` | Built — Black-Scholes, put-call parity verified |
+| Backtest | `src/backtest/engine.py` | Built — pre/post-2010 split, shares the live code path |
+| Risk | `src/risk/sizing.py` | Built — fractional Kelly, half-Kelly ceiling enforced |
+| Execution | `src/execution/` | Built — runner, tickets, expirations, trade log, Alpaca |
+
+All parameters in `config/params.yaml` are resolved; none are TBD.
+
+### Known limitations, stated upfront
+
+- **No real options chain data.** Legs are priced with Black-Scholes off a flat
+  VIX, so there is **no volatility skew**. Measured effect: the nominal
+  "0.20 delta" short put is really ~**0.24 delta**, and its premium is
+  understated ~49%. Win rates stay empirically valid (payoff is computed
+  against actual SPX paths); P&L is biased *low*, so the reported numbers are
+  conservative. Quantified in full, with a sensitivity run, in
+  [spec §7.1](docs/project_spec.md).
+- **Costs are assumed, not measured.** $0.65/contract and a 10% credit haircut
+  for slippage; neither has been verified against real XSP fills yet.
+- **The sample is small by construction.** ~3 trades/year means the backtest's
+  post-2010 sample is 42 trades. Treat every risk-adjusted number accordingly.

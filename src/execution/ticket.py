@@ -49,6 +49,17 @@ class Ticket:
     long_call_strike: float
     modeled_credit_usd: float
     max_loss_usd: float
+    wing_width_usd: float   # widest wing x multiplier x contracts, before credit
+
+    def max_loss_at_credit(self, net_credit_usd: float) -> float:
+        """Worst-case loss given the credit ACTUALLY received.
+
+        max_loss_usd is computed at the modeled mid. A real fill collects
+        less (slippage), and a smaller credit means a LARGER worst case.
+        Risk-cap checks must use this, not max_loss_usd, or the cap is
+        systematically breached by the size of the slippage haircut.
+        """
+        return self.wing_width_usd - net_credit_usd
 
 
 @dataclass
@@ -85,6 +96,8 @@ def build_ticket(
     multiplier: int = 100,
     wing_width_points: float | None = None,
     strike_increment: float | None = 1.0,
+    put_iv_adjustment: float = 0.0,
+    call_iv_adjustment: float = 0.0,
 ) -> Ticket:
     """Compute the strikes and modeled credit for one condor entry.
 
@@ -103,6 +116,21 @@ def build_ticket(
     and wings rounded outward, so rounding never accidentally tightens
     the position into more risk than intended. Pass None to disable
     (useful for backtests that price a theoretical continuous strike).
+
+    put_iv_adjustment / call_iv_adjustment shift the IV used to PRICE each
+    side, in vol decimals (0.03 = +3 vol points). They exist for SENSITIVITY
+    ANALYSIS of the flat-VIX assumption, not as a skew correction: real SPX
+    puts trade above VIX and calls below it, and these let that bias be
+    measured instead of merely disclosed. Defaults of 0.0 reproduce the
+    flat-VIX behaviour exactly.
+
+    Note the strikes are still SOLVED at the unadjusted IV. That is
+    deliberate and mirrors the real error: the model picks a strike
+    believing it is 0.20 delta, then the market prices that strike
+    differently. Adjusting the solve too would hide the very bias this
+    is meant to expose. It is also only first-order -- a real smile also
+    steepens toward the wings, which a single per-side shift cannot
+    represent.
     """
     if not 0 < implied_vol < 5:
         raise ValueError(f"implied_vol should be a decimal like 0.16, got {implied_vol}")
@@ -143,18 +171,24 @@ def build_ticket(
 
     # Price the ROUNDED strikes: the ticket must describe the order that
     # will actually be sent, not the continuous solve that preceded it.
+    put_iv = implied_vol + put_iv_adjustment
+    call_iv = implied_vol + call_iv_adjustment
+    if put_iv <= 0 or call_iv <= 0:
+        raise ValueError("IV adjustment drove an effective IV to zero or below")
+
     credit_per_unit = (
-        (bs_price(spot, short_put, t_years, risk_free_rate, implied_vol, "put")
-         - bs_price(spot, long_put, t_years, risk_free_rate, implied_vol, "put"))
-        + (bs_price(spot, short_call, t_years, risk_free_rate, implied_vol, "call")
-           - bs_price(spot, long_call, t_years, risk_free_rate, implied_vol, "call"))
+        (bs_price(spot, short_put, t_years, risk_free_rate, put_iv, "put")
+         - bs_price(spot, long_put, t_years, risk_free_rate, put_iv, "put"))
+        + (bs_price(spot, short_call, t_years, risk_free_rate, call_iv, "call")
+           - bs_price(spot, long_call, t_years, risk_free_rate, call_iv, "call"))
     )
     modeled_credit = credit_per_unit * multiplier * contracts
 
     # Max loss is set by the WIDER wing -- only one side can finish in the
     # money, so the loss is capped by whichever spread is wider, not their sum.
     widest_wing = max(short_put - long_put, long_call - short_call)
-    max_loss = widest_wing * multiplier * contracts - modeled_credit
+    wing_width_usd = widest_wing * multiplier * contracts
+    max_loss = wing_width_usd - modeled_credit
 
     return Ticket(
         spot=spot,
@@ -167,6 +201,7 @@ def build_ticket(
         long_call_strike=long_call,
         modeled_credit_usd=modeled_credit,
         max_loss_usd=max_loss,
+        wing_width_usd=wing_width_usd,
     )
 
 
