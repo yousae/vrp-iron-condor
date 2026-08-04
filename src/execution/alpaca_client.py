@@ -143,6 +143,21 @@ def get_client(paper: bool = True):
             "Copy .env.example to .env and fill them in."
         )
 
+    # Catch the paste mistakes that otherwise surface as an opaque 401.
+    # Error messages never include the value itself, only its shape.
+    for name, value in (("ALPACA_API_KEY", api_key), ("ALPACA_SECRET_KEY", secret_key)):
+        if value != value.strip():
+            raise RuntimeError(f"{name} has leading/trailing whitespace -- remove it from .env")
+        if value[:1] in {'"', "'"} or value[-1:] in {'"', "'"}:
+            raise RuntimeError(f"{name} is wrapped in quotes -- .env values take no quotes")
+        if " " in value:
+            raise RuntimeError(f"{name} contains a space -- looks like extra text was pasted")
+        if "=" in value:
+            raise RuntimeError(
+                f"{name} contains '=' -- looks like the whole line was pasted, "
+                "not just the value after the ="
+            )
+
     from alpaca.trading.client import TradingClient
 
     return TradingClient(api_key, secret_key, paper=True)
