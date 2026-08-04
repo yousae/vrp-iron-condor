@@ -58,10 +58,18 @@ selling beat both the market and unconditional selling, 1990–2018).
 
 ## 6. Data
 
-- **Paper execution and current chain data (greeks, IV): thinkorswim paperMoney** (Schwab). *Changed from Alpaca 2026-08-03.*
-  - **No API — orders are entered by hand.** The Schwab Trader API that replaced TD Ameritrade's supports live funded accounts only and cannot place paperMoney orders (verified 2026-08-03). `src/execution/manual_ticket.py` therefore generates order tickets and reconciles fills; it does not, and cannot, submit orders.
-  - **This is a net gain for the research, not just a constraint.** thinkorswim displays live per-strike IV and real bid/ask, which are precisely the two quantities this project currently has to assume: the **volatility skew** the flat-VIX proxy cannot model (§7), and the **real 4-leg spread cost** behind the 10% slippage assumption. Both become directly observable at fill time.
-  - **Cost model needs re-verification.** Schwab charges a per-contract options commission where Alpaca did not, so `backtest.cost_per_contract_usd` likely now understates true cost. Flagged in `config/params.yaml`; not silently adjusted.
+**Execution and market data use two different venues, deliberately.** Settled 2026-08-03 after evaluating thinkorswim; see §6.1 for why.
+
+- **Paper execution: Alpaca Trading API.** Supports XSP/SPX index options with 4-leg multi-leg orders, European-style with no early assignment — preserving the reason §2 chose an index product over SPY. Fully automated: `src/execution/alpaca_client.py` submits orders with no human in the loop, which is what makes the strategy genuinely *systematic* rather than discretionary.
+  - **Index options are paper-only on Alpaca at present.** Irrelevant here, since live trading is out of scope (§12).
+  - **Alpaca does not provide index option market data.** So strikes cannot be read off a live chain; they are computed from the model (`src/execution/ticket.py`, Black-Scholes off VIX) and snapped to the listed strike grid.
+- **Signal data: Yahoo Finance via `yfinance`** (VIX, SPX, `^IRX`). Unauthenticated, and the only data the automated loop depends on.
+- **Research observation: thinkorswim paperMoney.** *Not in the trading loop* — no automated path depends on it. It is consulted out-of-band because it displays live **per-strike IV** and **real bid/ask**, which are exactly the two quantities this project currently has to assume: the **volatility skew** the flat-VIX proxy cannot model (§7), and the **real 4-leg spread cost** behind the 10% slippage assumption.
+  - Keeping this separate matters: Alpaca states plainly that paper fills differ from live on fills, liquidity, and latency. Automated paper fills are therefore good evidence about *discipline* and weak evidence about *cost*. thinkorswim's displayed spread is the better cost evidence, so both venues are used for what each is actually good for.
+
+### 6.1 Why not run execution on thinkorswim
+
+thinkorswim paperMoney has **no API** — the Schwab Trader API that replaced TD Ameritrade's supports live funded accounts only and cannot place paperMoney orders (verified 2026-08-03). Manual entry would reintroduce human discretion at precisely the point the system exists to remove it, and every blow-up catalogued in the literature review (LJM, Malachite) was ultimately a discretionary override of a stated risk rule. A backtest is only evidence about a strategy if the strategy is what actually ran. So execution moved to Alpaca and thinkorswim was retained for the thing it is uniquely good at: showing real market microstructure.
 - **Historical options chain data for backtesting:** this is the known gap. Full historical SPX chains are the expensive part of this project. Plan:
   1. Start with a **VIX/realized-volatility proxy** to validate the IV-rank timing signal directionally before paying for anything.
   2. Evaluate a proper historical options data provider only once the signal shows enough promise on the proxy to justify the cost.
@@ -110,7 +118,7 @@ Paper trade the **loosest threshold (>50) only**, tagging each trade with its en
 
 **What the paper phase actually tests (all must pass):**
 
-1. **Execution works end-to-end.** 4-leg orders can actually be entered, filled, and settled as a single spread order. *(Manual entry — thinkorswim paperMoney has no API; see §6. The criterion is that the trade is executable at all, not that it is automated.)*
+1. **Execution works end-to-end.** 4-leg orders submit, fill, and settle automatically via the Alpaca API, with no human intervention. *(This is what makes the paper results evidence about the strategy rather than about the operator — see §6.1.)*
 2. **Fills match the model.** Median realized slippage stays within the modeled 10% haircut on net credit.
 3. **Signal fidelity.** The live signal fires on the dates the backtest says it would, given the same data.
 4. **Sim-to-live reconciliation.** Each closed trade's realized P&L matches what the pricing model predicts given the actual settlement price. *(This is the step most often skipped; persistent divergence means the simulator is wrong, which would make every backtest run through it suspect.)*
@@ -147,8 +155,14 @@ Paper trade the **loosest threshold (>50) only**, tagging each trade with its en
 | 4 | Signal calibration + benchmark comparison (pre-2010 / post-2010 split) |
 | 5 | Paper trading (pre-registered duration and criteria) |
 | 6 | Go/no-go decision |
-| 7 | Live trading (small capital) — only if Phase 6 passes |
+| 7 | ~~Live trading (small capital)~~ — **out of scope, decided 2026-08-03** |
 | 8 | Write-up |
+
+**Phase 7 is deliberately out of scope.** Paper trading is the terminal phase. This was decided *before* seeing paper results, not after a disappointing one, and it follows from §9.1: at 1.2–3.2 trades/year the strategy can never accumulate a statistically meaningful live sample within any horizon relevant to this project, so committing real capital would add risk without adding evidence. The write-up's conclusion rests on the backtest and the operational paper validation, which is the honest scope of what this project can actually demonstrate.
+
+Two consequences worth stating plainly:
+- `src/execution/alpaca_client.py` blocks live trading in code (`get_client(paper=False)` raises), so the decision is enforced rather than merely documented.
+- The standing rule in `CLAUDE.md` — no live environment without explicit per-session confirmation — remains in force regardless, as a safety rule independent of scope.
 
 ## References
 

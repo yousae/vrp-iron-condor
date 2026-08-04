@@ -10,7 +10,7 @@ pre-registered kill condition.
 
 import pytest
 
-from src.execution.manual_ticket import build_ticket, format_ticket, reconcile_fill
+from src.execution.ticket import build_ticket, format_ticket, reconcile_fill
 
 SPOT, IV, RATE, DTE = 760.0, 0.159, 0.04, 21
 
@@ -127,3 +127,50 @@ def test_format_ticket_contains_all_four_legs_and_symbol():
     assert out.count("SELL") == 2
     for strike in (t.long_put_strike, t.short_put_strike, t.short_call_strike, t.long_call_strike):
         assert f"{strike:,.2f}" in out
+
+
+# ---- strike rounding: only listed strikes are tradeable ----
+
+def test_strikes_snap_to_increment():
+    t = _ticket(wing_width_points=26.0, strike_increment=1.0)
+
+    for strike in (t.long_put_strike, t.short_put_strike, t.short_call_strike, t.long_call_strike):
+        assert strike == pytest.approx(round(strike))
+
+
+def test_rounding_is_outward_never_into_more_risk():
+    """Shorts must round further OTM and wings further out. Rounding
+    inward would build a position riskier than the model priced it."""
+    unrounded = _ticket(strike_increment=None)
+    rounded = _ticket(strike_increment=1.0)
+
+    assert rounded.short_put_strike <= unrounded.short_put_strike    # further from spot (down)
+    assert rounded.long_put_strike <= unrounded.long_put_strike
+    assert rounded.short_call_strike >= unrounded.short_call_strike  # further from spot (up)
+    assert rounded.long_call_strike >= unrounded.long_call_strike
+
+
+def test_none_increment_leaves_strikes_continuous():
+    t = _ticket(strike_increment=None)
+
+    assert t.short_put_strike != pytest.approx(round(t.short_put_strike))
+
+
+def test_credit_is_priced_on_rounded_strikes_not_unrounded():
+    """The ticket must describe the order that will actually be sent --
+    otherwise every reconciliation shows phantom slippage that was
+    really just a rounding artifact."""
+    coarse = _ticket(wing_width_points=26.0, strike_increment=5.0)
+    fine = _ticket(wing_width_points=26.0, strike_increment=None)
+
+    assert coarse.modeled_credit_usd != pytest.approx(fine.modeled_credit_usd)
+
+
+def test_too_coarse_increment_raises_rather_than_collapsing_a_spread():
+    with pytest.raises(ValueError, match="too coarse"):
+        _ticket(wing_width_points=2.0, strike_increment=50.0)
+
+
+def test_rejects_nonpositive_increment():
+    with pytest.raises(ValueError):
+        _ticket(strike_increment=0)

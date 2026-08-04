@@ -1,30 +1,35 @@
 """
-Manual execution support for thinkorswim paperMoney.
+Broker-neutral condor construction and fill reconciliation.
 
-thinkorswim paperMoney has no API -- the Schwab Trader API that replaced
-TD Ameritrade's covers live funded accounts only, and cannot place
-paperMoney orders (verified 2026-08-03). So orders are typed into the
-platform by hand. This module handles the parts that should NOT be
-manual: computing target strikes from the model, printing a ticket to
-enter, and reconciling what actually filled against what was predicted.
+Given spot / IV / rate, this computes the four strikes to trade, prices
+them, and later compares what actually filled against what was modeled.
+It is deliberately broker-agnostic: `src/execution/alpaca_client.py`
+submits these tickets to Alpaca, but the same Ticket can be typed into
+any platform by hand. Nothing here talks to a broker or places an order.
 
-That last part is the point. Phase 5's most important deliverable is
-sim-to-live reconciliation (project_spec.md section 9.2, criterion 4):
-if realized fills persistently diverge from the model, the backtest's
-cost assumptions are wrong -- which would make every backtest number
-this project has produced suspect, not merely optimistic. Manual entry
-is actually an advantage here, since the operator sees the real bid/ask
-and per-strike IV (the skew the flat-VIX proxy can't model) at fill time.
+Reconciliation is the reason this module matters. Phase 5's core
+deliverable is sim-to-live reconciliation (project_spec.md s9.2,
+criterion 4): if realized fills persistently diverge from the model,
+the backtest's cost assumptions are wrong -- which would make every
+backtest number this project has produced suspect, not merely
+optimistic.
 
-Nothing in this module talks to a broker. It cannot place an order.
+Strike rounding note: strikes solved from a target delta are continuous
+(e.g. 734.42), but only listed strikes are tradeable. build_ticket()
+therefore rounds to `strike_increment` and re-prices the ROUNDED
+strikes, so modeled credit describes the order that will actually be
+sent rather than a hypothetical one. Getting this backwards -- pricing
+the unrounded strikes -- would make every reconciliation look like
+slippage that was really just a rounding artifact.
 """
 
+import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 # needed so `from src...` resolves whether this file is run directly
-# (python src/execution/manual_ticket.py) or imported from elsewhere
+# (python src/execution/ticket.py) or imported from elsewhere
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.backtest.pricing import bs_price, strike_from_delta
@@ -32,7 +37,7 @@ from src.backtest.pricing import bs_price, strike_from_delta
 
 @dataclass
 class Ticket:
-    """A condor to enter by hand, priced at the model's mid."""
+    """A condor to trade, priced at the model's mid on rounded strikes."""
 
     spot: float
     implied_vol: float
@@ -79,6 +84,7 @@ def build_ticket(
     contracts: int = 1,
     multiplier: int = 100,
     wing_width_points: float | None = None,
+    strike_increment: float | None = 1.0,
 ) -> Ticket:
     """Compute the strikes and modeled credit for one condor entry.
 
@@ -91,11 +97,19 @@ def build_ticket(
     levels), so a fixed narrower wing may be required -- an open
     structural decision, see project_spec.md section 2. Passing None
     keeps the CNDR-comparable delta-based behavior.
+
+    strike_increment snaps strikes to the listed grid (XSP trades $1
+    increments; SPX is typically $5). Shorts are rounded AWAY from spot
+    and wings rounded outward, so rounding never accidentally tightens
+    the position into more risk than intended. Pass None to disable
+    (useful for backtests that price a theoretical continuous strike).
     """
     if not 0 < implied_vol < 5:
         raise ValueError(f"implied_vol should be a decimal like 0.16, got {implied_vol}")
     if contracts < 1:
         raise ValueError("contracts must be >= 1")
+    if strike_increment is not None and strike_increment <= 0:
+        raise ValueError("strike_increment must be positive, or None to disable rounding")
 
     t_years = dte_days / 252.0
 
@@ -109,6 +123,26 @@ def build_ticket(
         long_put = short_put - wing_width_points
         long_call = short_call + wing_width_points
 
+    if strike_increment is not None:
+        inc = strike_increment
+        # Round every strike outward (away from spot): shorts further OTM
+        # reduces assignment probability, wings further out widens the
+        # spread. Both are the conservative direction -- rounding inward
+        # would silently create a position riskier than the model priced.
+        short_put = math.floor(short_put / inc) * inc
+        long_put = math.floor(long_put / inc) * inc
+        short_call = math.ceil(short_call / inc) * inc
+        long_call = math.ceil(long_call / inc) * inc
+
+        if not (long_put < short_put and short_call < long_call):
+            raise ValueError(
+                f"strike_increment={inc} is too coarse for these strikes -- rounding "
+                f"collapsed a spread (put {long_put}/{short_put}, call {short_call}/{long_call}). "
+                "Widen the wings or use a finer increment."
+            )
+
+    # Price the ROUNDED strikes: the ticket must describe the order that
+    # will actually be sent, not the continuous solve that preceded it.
     credit_per_unit = (
         (bs_price(spot, short_put, t_years, risk_free_rate, implied_vol, "put")
          - bs_price(spot, long_put, t_years, risk_free_rate, implied_vol, "put"))
@@ -137,10 +171,11 @@ def build_ticket(
 
 
 def format_ticket(ticket: Ticket, symbol: str = "XSP") -> str:
-    """Human-readable order ticket to type into thinkorswim.
+    """Human-readable rendering of a ticket, for logs and eyeballing.
 
     Leg order matches how an iron condor is conventionally entered
     (long put, short put, short call, long call -- low strike to high).
+    Alpaca submission uses the Ticket fields directly, not this string.
     """
     n = ticket.contracts
     return "\n".join([
@@ -155,7 +190,7 @@ def format_ticket(ticket: Ticket, symbol: str = "XSP") -> str:
         f"  modeled credit (mid):  ${ticket.modeled_credit_usd:>10,.2f}",
         f"  max loss:              ${ticket.max_loss_usd:>10,.2f}",
         "",
-        "  Enter as a single 4-leg order. Record the ACTUAL fill credit and",
+        "  Submit as a single 4-leg order. Record the ACTUAL fill credit and",
         "  pass it to reconcile_fill() -- do not assume the mid filled.",
     ])
 
@@ -192,8 +227,8 @@ def reconcile_fill(
 
 
 if __name__ == "__main__":
-    # XSP at 1/10 SPX, narrowed wings -- the only structure that fits a
-    # $10k paper account under the 2% per-trade cap. See project_spec s2.
+    # XSP at 1/10 SPX. $1 strike increments, near-CNDR wings -- the
+    # structure that fits a $100k paper account at the 2% cap.
     ticket = build_ticket(
         spot=760.0,
         implied_vol=0.159,
@@ -202,7 +237,8 @@ if __name__ == "__main__":
         long_delta=0.05,
         dte_days=21,
         contracts=1,
-        wing_width_points=3.0,
+        wing_width_points=26.0,
+        strike_increment=1.0,
     )
     print(format_ticket(ticket, symbol="XSP"))
     print()

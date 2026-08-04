@@ -41,14 +41,13 @@ backtest:
   regime_split_year: 2010
   model_transaction_costs: true
   model_bid_ask_slippage: true
-  # NEEDS RE-VERIFICATION after the move to thinkorswim (2026-08-03).
-  # This 0.65 was set when the plan was Alpaca, where it represented
-  # exchange/regulatory fees only because Alpaca charges no options
-  # commission. Schwab/thinkorswim DOES charge a per-contract options
-  # commission, so the true all-in cost is this commission PLUS
-  # regulatory fees -- i.e. the backtest is now likely UNDERSTATING
-  # costs. Left unchanged rather than guessed at; confirm the actual
-  # Schwab rate for XSP/SPX index options and update. Flagged to Carter.
+  # NEEDS VERIFICATION for XSP specifically. Alpaca charges no options
+  # commission, so this 0.65 represents exchange/regulatory fees only --
+  # which is the right shape for an Alpaca-executed strategy. But Alpaca
+  # notes that INDEX options carry exchange fees that differ from standard
+  # equity options, and this number was never sourced for XSP. Confirm the
+  # actual per-contract XSP fee and update. Flagged to Carter alongside the
+  # slippage question -- same research trip.
   cost_per_contract_usd: 0.65
   slippage_pct_of_credit: 0.10       # haircut on net credit to proxy 4-leg bid-ask slippage
 
