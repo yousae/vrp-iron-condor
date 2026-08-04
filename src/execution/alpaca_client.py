@@ -174,12 +174,37 @@ def build_condor_order(ticket: Ticket, underlying: str, expiration: date, limit_
     return LimitOrderRequest(limit_price=round(limit_credit, 2), **common)
 
 
+PAPER_BASE_URL = "https://paper-api.alpaca.markets"
+
+
+def assert_paper_client(client) -> None:
+    """Hard gate: refuse to act on anything but the paper endpoint.
+
+    Defence in depth. get_client() already hardcodes paper=True and
+    rejects paper=False, but this sits at the actual mutating call, so a
+    future edit that constructs a client some other way still cannot
+    reach live. Checks the resolved base URL rather than a flag, because
+    the URL is what actually determines where the order goes.
+    """
+    base = str(getattr(getattr(client, "_base_url", ""), "value", getattr(client, "_base_url", "")))
+    if base != PAPER_BASE_URL:
+        raise RuntimeError(
+            f"REFUSING to submit: client points at {base!r}, not the paper endpoint "
+            f"({PAPER_BASE_URL!r}). Live trading is out of scope for this project."
+        )
+    if not getattr(client, "_sandbox", False):
+        raise RuntimeError("REFUSING to submit: client is not in sandbox/paper mode.")
+
+
 def submit_order(client, order_request):
     """Submit a prepared order. The only network call in this module.
 
     Kept deliberately thin -- everything that can be wrong is decided in
-    build_condor_order(), which is testable without credentials.
+    build_condor_order(), which is testable without credentials -- except
+    the paper-endpoint assertion, which belongs here precisely because
+    this is the line that has consequences.
     """
+    assert_paper_client(client)
     return client.submit_order(order_request)
 
 

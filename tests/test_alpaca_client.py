@@ -122,3 +122,50 @@ def test_get_client_requires_credentials(monkeypatch):
 
     with pytest.raises(RuntimeError, match="not found in environment"):
         get_client(paper=True)
+
+
+# ---- paper-endpoint hard gate ----
+
+def test_assert_paper_allows_a_paper_client():
+    from alpaca.trading.client import TradingClient
+
+    from src.execution.alpaca_client import assert_paper_client
+
+    assert_paper_client(TradingClient("k", "s", paper=True))  # must not raise
+
+
+def test_assert_paper_blocks_a_live_client():
+    from alpaca.trading.client import TradingClient
+
+    from src.execution.alpaca_client import assert_paper_client
+
+    with pytest.raises(RuntimeError, match="REFUSING"):
+        assert_paper_client(TradingClient("k", "s", paper=False))
+
+
+def test_assert_paper_blocks_url_override_to_live():
+    """A future edit could construct a client some other way; the gate
+    checks the resolved URL, not the flag that was passed."""
+    from alpaca.trading.client import TradingClient
+
+    from src.execution.alpaca_client import assert_paper_client
+
+    sneaky = TradingClient("k", "s", paper=True, url_override="https://api.alpaca.markets")
+    with pytest.raises(RuntimeError, match="REFUSING"):
+        assert_paper_client(sneaky)
+
+
+def test_submit_order_refuses_a_live_client_before_any_network_call():
+    """The gate must fire BEFORE submit_order touches the client, so a
+    live client can never reach the wire even once."""
+    from src.execution.alpaca_client import submit_order
+
+    class ExplodingClient:
+        _base_url = "https://api.alpaca.markets"
+        _sandbox = False
+
+        def submit_order(self, *a, **k):
+            raise AssertionError("network call reached on a live client")
+
+    with pytest.raises(RuntimeError, match="REFUSING"):
+        submit_order(ExplodingClient(), object())
