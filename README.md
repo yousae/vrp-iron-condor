@@ -33,7 +33,7 @@ src/data/          data ingestion (VIX/RV proxy first, options chain provider la
 src/signals/       IV rank and entry signal logic
 src/risk/          position sizing (fractional Kelly, fixed-risk caps)
 src/backtest/      backtest engine
-src/execution/     condor tickets, fill reconciliation, Alpaca paper execution
+src/execution/     runner, condor tickets, expirations, trade log, Alpaca paper
 tests/             unit tests
 ```
 

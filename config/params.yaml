@@ -13,6 +13,25 @@ structure:
   long_delta: 0.05
   cycle: monthly
 
+# Live paper-trading structure. Confirmed 2026-08-03 for the paper phase.
+#
+# wing_width_points is sized for HEADROOM under max_risk_per_trade_pct,
+# not to the maximum that technically fits. At $100k the 2% cap is $2,000;
+# 26pt wings produce a max loss of ~$2,006-$2,128 depending on spot and
+# VIX, so the strategy would flip between tradeable and untradeable as the
+# market moved -- silently never trading. 22pt keeps worst-case max loss
+# at ~$1,754 (12% headroom) across spot 700-820 and IV 12-40%.
+#
+# Cost: ~74% of CNDR's delta-implied width rather than ~88%, so benchmark
+# comparability is slightly weaker. Reliably trading a slightly narrower
+# condor beats intermittently trading a wider one. Revisit when Carter's
+# instrument research lands -- this is config, not baked into logic.
+execution:
+  symbol: XSP                        # Mini-SPX: cash-settled, European, 1/10 SPX
+  wing_width_points: 22.0
+  strike_increment: 1.0              # XSP lists $1 strikes
+  target_calendar_days_to_expiry: 30 # ~21 trading days, matches the backtest
+
 exit:
   version: v1_hold_to_expiration   # switch to "v2_close_at_50pct_max_profit" once v1 is validated
 
@@ -22,7 +41,7 @@ risk:
                                       # v1 backtest engine only ever holds 1 position at a time,
                                       # so this doesn't bind yet -- forward-looking for Phase 5+
                                       # (paper trading, or overlapping cycles/thresholds later).
-  starting_capital_usd: 1000         # placeholder, confirm together
+  starting_capital_usd: 100000       # Alpaca paper account, confirmed 2026-08-03
   kelly_fraction: 0.5                # half-Kelly; never 1.0
 
 # Phase 3 proxy backtest: we don't have real historical SPX options chain
