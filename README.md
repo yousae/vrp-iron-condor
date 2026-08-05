@@ -4,7 +4,7 @@ A systematic, defined-risk options-selling study: harvest the volatility risk
 premium on S&P 500 index options via IV-rank-timed iron condors, backtest it
 honestly, and paper trade it end to end.
 
-**[▶ Live dashboard](DASHBOARD_URL_HERE)** · [Methodology](docs/project_spec.md) · [Literature review](docs/research/vrp_literature_review.md)
+**[▶ Live dashboard](https://vrp-iron-condor-5wmttbesnnjda7cm9vk2tm.streamlit.app/)** · [Methodology](docs/project_spec.md) · [Literature review](docs/research/vrp_literature_review.md)
 
 Executed on **XSP** (Mini-SPX — cash-settled, European, 1/10 the size of SPX),
 which is what makes a position small enough to respect a 2%-of-capital risk cap.

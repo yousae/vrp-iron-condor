@@ -187,6 +187,7 @@ def main() -> None:
     with open(REPO_ROOT / "config" / "params.yaml") as f:
         config = yaml.safe_load(f)
     thresholds = config["signal"]["iv_rank_thresholds_to_test"]
+    execution = config["execution"]
 
     chart_df = load_chart_data()
     backtest = load_backtest_data()
@@ -194,7 +195,9 @@ def main() -> None:
 
     st.markdown("### VRP / SPX Iron Condor")
     st.caption(
-        f"Underlying: SPX  ·  Structure: iron condor, monthly  ·  Phase 3/8  ·  research only, no live trading  ·  "
+        f"Underlying: {execution['symbol']} (Mini-SPX, cash-settled)  ·  iron condor, "
+        f"{execution['wing_width_points']:.0f}pt wings, monthly  ·  Phase 5/8 — paper trading  ·  "
+        f"no live trading  ·  "
         f"data as of {datetime.now().strftime('%Y-%m-%d %H:%M')}"
     )
 
