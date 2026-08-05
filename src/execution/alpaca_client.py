@@ -166,6 +166,43 @@ def get_client(paper: bool = True):
 REQUIRED_OPTIONS_LEVEL = 3  # multi-leg spreads need Level 3 on Alpaca
 
 
+def with_retry(fn, attempts: int = 4, base_delay: float = 2.0, what: str = "API call"):
+    """Retry a read-only call through transient upstream failures.
+
+    Run 31032305966 died on an Alpaca 500 during the strike-grid fetch --
+    their server, not our bug, but it crashed the whole unattended run. On
+    a job that fires ~3 times a year, losing the one day that matters to a
+    random 5xx is unacceptable.
+
+    Retries 5xx and connection/timeout errors with exponential backoff.
+    Does NOT retry 4xx: a bad symbol or a permissions problem will fail
+    identically every time, and retrying just delays a real error.
+
+    Only wrap IDEMPOTENT calls. Never wrap order submission -- a timeout
+    there may mean the order landed anyway, and a blind retry could open
+    a second position.
+    """
+    import time
+
+    last = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return fn()
+        except Exception as exc:
+            last = exc
+            text = str(exc)
+            transient = (
+                any(code in text for code in ("500", "502", "503", "504"))
+                or any(word in text.lower() for word in ("timeout", "timed out", "connection"))
+            )
+            if not transient or attempt == attempts:
+                raise
+            delay = base_delay * (2 ** (attempt - 1))
+            print(f"  {what} failed ({text[:60]}...) -- retry {attempt}/{attempts - 1} in {delay:.0f}s")
+            time.sleep(delay)
+    raise last
+
+
 def preflight(client) -> dict:
     """Read-only account check. Places nothing.
 
@@ -175,7 +212,7 @@ def preflight(client) -> dict:
     a 4-leg spread, and is anything blocked.
     """
     assert_paper_client(client)
-    acct = client.get_account()
+    acct = with_retry(client.get_account, what="account preflight")
 
     approved = getattr(acct, "options_approved_level", None)
     trading = getattr(acct, "options_trading_level", None)
@@ -226,8 +263,11 @@ def fetch_listed_strikes(client, underlying: str, expiration: date) -> list[floa
     from alpaca.trading.requests import GetOptionContractsRequest
 
     assert_paper_client(client)
-    res = client.get_option_contracts(GetOptionContractsRequest(
-        underlying_symbols=[underlying.upper()], expiration_date=expiration, limit=10000))
+    res = with_retry(
+        lambda: client.get_option_contracts(GetOptionContractsRequest(
+            underlying_symbols=[underlying.upper()], expiration_date=expiration, limit=10000)),
+        what=f"fetch {underlying} strike grid",
+    )
     return sorted({float(c.strike_price) for c in res.option_contracts})
 
 
@@ -327,7 +367,7 @@ def market_status(client) -> dict:
     from datetime import datetime, timezone
 
     assert_paper_client(client)
-    clock = client.get_clock()
+    clock = with_retry(client.get_clock, what="market clock")
     now = clock.timestamp or datetime.now(timezone.utc)
     minutes_to_close = (clock.next_close - now).total_seconds() / 60 if clock.is_open else 0.0
 

@@ -292,3 +292,47 @@ def test_enough_time_to_work_an_order(is_open, mins, steps, secs, expected):
 
     status = {"is_open": is_open, "minutes_to_close": mins}
     assert enough_time_to_work_an_order(status, steps, secs) is expected
+
+
+# ---- transient-failure retry ----
+
+def test_with_retry_recovers_from_a_transient_500():
+    """An Alpaca 500 crashed a full unattended run. On a job that fires ~3x
+    a year, losing the one day that matters to a random 5xx is unacceptable."""
+    from src.execution.alpaca_client import with_retry
+
+    calls = {"n": 0}
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise RuntimeError("500 Internal Server Error")
+        return "ok"
+
+    assert with_retry(flaky, base_delay=0) == "ok"
+    assert calls["n"] == 3
+
+
+def test_with_retry_does_not_retry_client_errors():
+    """A 4xx fails identically every time; retrying only delays a real error."""
+    from src.execution.alpaca_client import with_retry
+
+    calls = {"n": 0}
+
+    def bad_request():
+        calls["n"] += 1
+        raise RuntimeError("422 invalid legs: asset not found")
+
+    with pytest.raises(RuntimeError, match="422"):
+        with_retry(bad_request, base_delay=0)
+    assert calls["n"] == 1
+
+
+def test_with_retry_gives_up_and_reraises():
+    from src.execution.alpaca_client import with_retry
+
+    def always_down():
+        raise RuntimeError("503 Service Unavailable")
+
+    with pytest.raises(RuntimeError, match="503"):
+        with_retry(always_down, attempts=3, base_delay=0)
