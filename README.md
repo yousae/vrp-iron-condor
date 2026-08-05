@@ -77,6 +77,25 @@ waiting months for the signal (it fires ~3x/year), and is logged as
 hardcodes the paper endpoint and rejects `paper=False`, and `submit_order()`
 independently re-checks the resolved base URL before every submission.
 
+## Automation
+
+`.github/workflows/paper-trade.yml` runs the decision once per weekday at
+19:30 UTC (15:30 ET summer / 14:30 ET winter — a single UTC time chosen so both
+land inside market hours, since GitHub cron has no DST handling). Holidays and
+early closes are handled at runtime via Alpaca's clock rather than a hardcoded
+calendar.
+
+The workflow runs the test suite before it is allowed to trade, and commits the
+trade log back to the repo afterwards — a cloud runner is ephemeral, and that
+log is the dataset the write-up depends on.
+
+Requires two repo secrets: `ALPACA_API_KEY` and `ALPACA_SECRET_KEY` (paper
+keys). Set them under Settings → Secrets and variables → Actions. Secrets are
+not exposed to forks or printed in logs, so this is safe on a public repo.
+
+You can trigger a run by hand from the Actions tab; it defaults to a dry run
+that decides and logs but submits nothing.
+
 ## Status
 
 | Stage | Module | State |

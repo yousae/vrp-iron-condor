@@ -276,3 +276,19 @@ def test_close_all_legs_closes_shorts_before_longs():
 
     assert client.closed[:2] == ["SHORT_PUT", "SHORT_CALL"]
     assert set(client.closed[2:]) == {"LONG_CALL", "LONG_PUT"}
+
+
+# ---- market-hours guard ----
+
+@pytest.mark.parametrize("is_open,mins,steps,secs,expected", [
+    (True, 60.0, 5, 60, True),    # plenty of room
+    (True, 10.1, 5, 60, True),    # exactly enough (5 min ladder + 5 min buffer)
+    (True, 8.0, 5, 60, False),    # ladder wouldn't finish
+    (True, 3.0, 1, 60, False),    # even a 1-step ladder needs the buffer
+    (False, 0.0, 5, 60, False),   # closed
+])
+def test_enough_time_to_work_an_order(is_open, mins, steps, secs, expected):
+    from src.execution.alpaca_client import enough_time_to_work_an_order
+
+    status = {"is_open": is_open, "minutes_to_close": mins}
+    assert enough_time_to_work_an_order(status, steps, secs) is expected

@@ -93,3 +93,24 @@ def test_wing_width_has_headroom_across_market_regimes():
             d = decide(CONFIG, {**MARKET, "spot_spx": spot, "vix": vix}, EDGE)
             assert d["trade"] is True, f"declined to trade at spot={spot} vix={vix}"
             assert d["ticket"].max_loss_usd <= cap * 0.95, f"under 5% headroom at spot={spot} vix={vix}"
+
+
+def test_decide_uses_real_strikes_when_given_them():
+    """Snapping to the real grid changes wing width, hence max loss, hence
+    how many contracts fit the cap. Sizing on an assumed grid and trading a
+    real one sizes against a trade that does not exist."""
+    coarse = [float(k) for k in range(600, 900, 5)]   # $5 grid, unlike the assumed $1
+    d = decide(CONFIG, MARKET, EDGE, available_strikes=coarse)
+
+    assert d["trade"] is True
+    for strike in (d["ticket"].long_put_strike, d["ticket"].short_put_strike,
+                   d["ticket"].short_call_strike, d["ticket"].long_call_strike):
+        assert strike in coarse, f"{strike} is not a listed strike"
+
+
+def test_decide_still_respects_the_cap_on_a_real_grid():
+    coarse = [float(k) for k in range(600, 900, 5)]
+    d = decide(CONFIG, MARKET, EDGE, available_strikes=coarse)
+    cap = CONFIG["risk"]["starting_capital_usd"] * CONFIG["risk"]["max_risk_per_trade_pct"]
+
+    assert d["ticket"].max_loss_usd <= cap

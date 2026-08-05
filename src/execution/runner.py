@@ -118,11 +118,20 @@ def backtest_edge(config: dict) -> dict:
     }
 
 
-def decide(config: dict, market: dict, edge: dict) -> dict:
+def decide(config: dict, market: dict, edge: dict,
+           available_strikes: list[float] | None = None) -> dict:
     """Pure decision step: should we trade, and if so, what exactly?
 
     No network, no side effects -- so the whole decision is testable
-    without credentials or a live market.
+    without credentials or a live market. available_strikes is DATA, not
+    a lookup: the caller fetches the real listed grid and passes it in.
+
+    Passing it matters for correctness, not just symbol validity. Snapping
+    to real strikes changes the wing width, which changes max loss, which
+    changes how many contracts fit the risk cap. Sizing against an assumed
+    grid and then trading a real one would size the position against a
+    trade that does not exist. Omitting it falls back to strike_increment,
+    which is right for the backtest (no API there) and wrong for live.
     """
     threshold = config["paper_trading"]["paper_stream_threshold"]
     execution = config["execution"]
@@ -154,6 +163,7 @@ def decide(config: dict, market: dict, edge: dict) -> dict:
         contracts=1,
         wing_width_points=execution["wing_width_points"],
         strike_increment=execution["strike_increment"],
+        available_strikes=available_strikes,
     )
 
     slippage = config["backtest"]["slippage_pct_of_credit"]
@@ -176,6 +186,7 @@ def decide(config: dict, market: dict, edge: dict) -> dict:
         contracts=contracts,
         wing_width_points=execution["wing_width_points"],
         strike_increment=execution["strike_increment"],
+        available_strikes=available_strikes,
     )
     expiration = next_monthly_expiration(
         market["as_of"], execution["target_calendar_days_to_expiry"]
@@ -195,9 +206,47 @@ def decide(config: dict, market: dict, edge: dict) -> dict:
 def run(dry_run: bool = True, config: dict | None = None) -> dict:
     """One decision cycle. Logs whatever happens, trade or not."""
     config = config or load_config()
+
+    # Market-hours guard, only when we might actually submit. A scheduled
+    # job fires on holidays and early-close days too, and Alpaca's clock
+    # knows about both without us keeping a calendar.
+    if not dry_run:
+        from src.execution.alpaca_client import (
+            enough_time_to_work_an_order,
+            get_client,
+            market_status,
+        )
+
+        ow = config["execution"]["order_work"]
+        status = market_status(get_client(paper=True))
+        if not status["is_open"]:
+            trade_log.append({"kind": "signal_check", "fired": False, "submitted": False,
+                              "reason": f"market closed; next open {status['next_open']}"})
+            return {"submitted": False, "trade": False,
+                    "reason": f"market closed; next open {status['next_open']}"}
+        if not enough_time_to_work_an_order(status, ow["steps"], ow["seconds_per_step"]):
+            reason = (f"only {status['minutes_to_close']:.0f} min to close -- not enough to work "
+                      f"the full {ow['steps']}-step ladder; skipping rather than half-working it")
+            trade_log.append({"kind": "signal_check", "fired": False, "submitted": False,
+                              "reason": reason})
+            return {"submitted": False, "trade": False, "reason": reason}
     market = current_market()
     edge = backtest_edge(config)
-    decision = decide(config, market, edge)
+
+    # Fetch the real strike grid BEFORE deciding. Deciding on an assumed
+    # grid and then trading a real one would size the position against a
+    # trade that does not exist -- and would be rejected outright, on the
+    # one day a year the signal actually fires.
+    available_strikes = None
+    if not dry_run:
+        from src.execution.alpaca_client import fetch_listed_strikes, get_client
+
+        expiration_probe = next_monthly_expiration(
+            market["as_of"], config["execution"]["target_calendar_days_to_expiry"])
+        available_strikes = fetch_listed_strikes(
+            get_client(paper=True), config["execution"]["symbol"], expiration_probe)
+
+    decision = decide(config, market, edge, available_strikes=available_strikes)
 
     trade_log.append({
         "kind": "signal_check",
@@ -219,10 +268,9 @@ def run(dry_run: bool = True, config: dict | None = None) -> dict:
     if dry_run:
         return {"submitted": False, "dry_run": True, **decision}
 
-    from src.execution.alpaca_client import fetch_listed_strikes, get_client, work_order
+    from src.execution.alpaca_client import get_client, work_order
 
     client = get_client(paper=True)
-    strikes = fetch_listed_strikes(client, symbol, expiration)
     ow = config["execution"]["order_work"]
     result = work_order(
         client, ticket, symbol, expiration,

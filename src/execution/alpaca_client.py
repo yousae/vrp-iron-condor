@@ -317,6 +317,44 @@ def assert_paper_client(client) -> None:
         raise RuntimeError("REFUSING to submit: client is not in sandbox/paper mode.")
 
 
+def market_status(client) -> dict:
+    """Whether the market is open, and how long until it closes.
+
+    Uses Alpaca's clock rather than a hardcoded schedule, so market
+    holidays and early closes are handled without maintaining a calendar
+    -- a scheduled job will otherwise happily fire on Thanksgiving.
+    """
+    from datetime import datetime, timezone
+
+    assert_paper_client(client)
+    clock = client.get_clock()
+    now = clock.timestamp or datetime.now(timezone.utc)
+    minutes_to_close = (clock.next_close - now).total_seconds() / 60 if clock.is_open else 0.0
+
+    return {
+        "is_open": bool(clock.is_open),
+        "now": now,
+        "next_open": clock.next_open,
+        "next_close": clock.next_close,
+        "minutes_to_close": round(minutes_to_close, 1),
+    }
+
+
+def enough_time_to_work_an_order(status: dict, steps: int, seconds_per_step: int,
+                                 buffer_minutes: float = 5.0) -> bool:
+    """Is there room to walk the full price ladder before the close?
+
+    Starting a five-minute walk two minutes before the bell would leave
+    the last, most-likely-to-fill step unattempted and the order dead at
+    the close -- indistinguishable in the log from "the market would not
+    pay our price", which is a different and much more meaningful result.
+    """
+    if not status["is_open"]:
+        return False
+    needed = (steps * seconds_per_step) / 60 + buffer_minutes
+    return status["minutes_to_close"] >= needed
+
+
 def close_all_legs(client, pause_seconds: int = 3) -> list[dict]:
     """Flatten every open option leg, SHORTS FIRST.
 

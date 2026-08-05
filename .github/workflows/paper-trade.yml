@@ -1,0 +1,74 @@
+name: paper-trade
+
+# 19:30 UTC on weekdays. That is 15:30 ET in summer and 14:30 ET in winter --
+# GitHub cron has no DST handling, so this single UTC time was chosen because
+# BOTH land inside market hours (09:30-16:00 ET) with room to work an order.
+# Holidays and early closes are handled at runtime via Alpaca's clock, not here.
+#
+# Why near the close: the backtest computes the signal from daily CLOSE data,
+# so trading late in the session is the closest live approximation. It is not
+# exact -- a real, disclosed backtest/live divergence.
+on:
+  schedule:
+    - cron: "30 19 * * 1-5"
+  workflow_dispatch:          # lets you trigger a run by hand from the Actions tab
+    inputs:
+      dry_run:
+        description: "Decide and log, but submit nothing"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write             # needed to commit the trade log back
+
+concurrency:
+  group: paper-trade          # never let two runs trade at once
+  cancel-in-progress: false
+
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25       # a 5-step ladder is ~5 min; this is generous headroom
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Run tests before trading
+        # A broken build must never place an order. This is cheap (~1s) and is
+        # the last line of defence between a bad commit and a live submission.
+        run: python -m pytest tests/ -q
+
+      - name: Decide and trade
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "manual dry run -- nothing will be submitted"
+            python -m src.execution.runner
+          else
+            python -m src.execution.runner --submit
+          fi
+
+      - name: Commit the trade log
+        # The log is the dataset the write-up depends on (spec s5). A cloud
+        # runner is ephemeral, so it has to be persisted back to the repo or
+        # every signal check is lost. [skip ci] stops this commit re-triggering.
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain logs/)" ]; then
+            git add logs/
+            git commit -m "trade log: $(date -u +%Y-%m-%d) [skip ci]"
+            git pull --rebase --autostash origin main
+            git push
+          else
+            echo "no log changes"
+          fi
