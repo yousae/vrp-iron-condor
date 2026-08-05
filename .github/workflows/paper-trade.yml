@@ -10,7 +10,21 @@ name: paper-trade
 # exact -- a real, disclosed backtest/live divergence.
 on:
   schedule:
+    # Primary at 19:30 UTC, then two backups 10 minutes apart. Only the
+    # FIRST to succeed decides -- the runner checks trade_log.decided_today()
+    # and exits in seconds otherwise. This is redundancy against a failed
+    # run, NOT extra trading: still one decision per day, still near the
+    # close, so it stays faithful to a backtest built on daily closes.
+    #
+    # At ~3 trades/year, losing the one day that matters to a transient
+    # Alpaca 5xx or a delayed GitHub scheduler is the expensive failure.
+    # Both happened during setup on 2026-08-05.
+    #
+    # 19:50 UTC is the latest usable slot: 15:50 ET leaves 10 minutes to
+    # the close, exactly what the 5-step price ladder plus buffer needs.
     - cron: "30 19 * * 1-5"
+    - cron: "40 19 * * 1-5"
+    - cron: "50 19 * * 1-5"
   workflow_dispatch:          # lets you trigger a run by hand from the Actions tab
     inputs:
       dry_run:

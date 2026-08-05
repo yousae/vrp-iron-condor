@@ -206,6 +206,15 @@ def decide(config: dict, market: dict, edge: dict,
 def run(dry_run: bool = True, config: dict | None = None) -> dict:
     """One decision cycle. Logs whatever happens, trade or not."""
     config = config or load_config()
+    mode = "dry" if dry_run else "submit"
+
+    # One decision per day. Several runs are scheduled so a failure does not
+    # cost the day; the first to succeed decides and the rest exit here,
+    # before any data fetch or backtest. Checked first because it is the
+    # cheapest possible exit.
+    if not dry_run and trade_log.decided_today():
+        return {"submitted": False, "trade": False, "already_decided_today": True,
+                "reason": "a decision was already logged today; backup run exiting"}
 
     # Market-hours guard, only when we might actually submit. A scheduled
     # job fires on holidays and early-close days too, and Alpaca's clock
@@ -250,6 +259,7 @@ def run(dry_run: bool = True, config: dict | None = None) -> dict:
 
     trade_log.append({
         "kind": "signal_check",
+        "mode": mode,
         "as_of": market["as_of"],
         "iv_rank": round(market["iv_rank"], 2),
         "vix": round(market["vix"], 2),
@@ -280,7 +290,7 @@ def run(dry_run: bool = True, config: dict | None = None) -> dict:
     )
     if not result["filled"]:
         trade_log.append({
-            "kind": "signal_check", "as_of": market["as_of"],
+            "kind": "signal_check", "mode": mode, "as_of": market["as_of"],
             "fired": True, "submitted": False,
             "reason": "worked the order to the floor without a fill -- the market would not "
                       "pay better than the pre-registered slippage threshold, so no trade",
@@ -291,6 +301,7 @@ def run(dry_run: bool = True, config: dict | None = None) -> dict:
 
     trade_log.append({
         "kind": "order_submitted",
+        "mode": mode,
         "order_id": str(getattr(order, "id", "unknown")),
         "as_of": market["as_of"],
         "symbol": symbol,

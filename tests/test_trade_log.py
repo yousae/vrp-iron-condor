@@ -6,6 +6,7 @@ open_positions() to isolate the decision tests, which would silently
 neuter these.
 """
 
+import json
 from datetime import date
 from pathlib import Path
 
@@ -78,3 +79,38 @@ def test_rejected_order_is_not_an_open_position(tmp_path: Path):
                       "order_status": "OrderStatus.REJECTED"}, log)
 
     assert trade_log.open_positions(log) == []
+
+
+# ---- one decision per day (backs the redundant schedule) ----
+
+def test_decided_today_false_on_an_empty_log(tmp_path: Path):
+    assert trade_log.decided_today(tmp_path / "t.jsonl") is False
+
+
+def test_decided_today_true_after_a_submit_run(tmp_path: Path):
+    log = tmp_path / "t.jsonl"
+    trade_log.append({"kind": "signal_check", "mode": "submit", "fired": False}, log)
+
+    assert trade_log.decided_today(log) is True
+
+
+def test_dry_run_does_not_block_the_real_decision(tmp_path: Path):
+    """A dry run must never suppress that day's actual decision -- running
+    the runner by hand in the morning would otherwise silently skip the
+    scheduled run, a worse failure than the one this guard prevents."""
+    log = tmp_path / "t.jsonl"
+    trade_log.append({"kind": "signal_check", "mode": "dry", "fired": False}, log)
+
+    assert trade_log.decided_today(log) is False
+
+
+def test_yesterdays_decision_does_not_block_today(tmp_path: Path):
+    from datetime import date as _date, datetime as _dt, timedelta, timezone as _tz
+
+    log = tmp_path / "t.jsonl"
+    yesterday = (_dt.now(_tz.utc) - timedelta(days=1)).isoformat()
+    log.parent.mkdir(parents=True, exist_ok=True)
+    log.write_text(json.dumps({"logged_at": yesterday, "kind": "signal_check",
+                               "mode": "submit", "fired": False}) + "\n")
+
+    assert trade_log.decided_today(log) is False

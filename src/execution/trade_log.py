@@ -64,6 +64,27 @@ def read_kind(kind: str, path: Path = DEFAULT_LOG_PATH) -> list[dict]:
     return [r for r in read_all(path) if r.get("kind") == kind]
 
 
+def decided_today(path: Path = DEFAULT_LOG_PATH, on_date: date | None = None) -> bool:
+    """Has a real decision already been logged today (UTC)?
+
+    Backs the redundant-schedule design: several runs are scheduled so a
+    failed one does not cost the day, but only the FIRST to succeed may
+    decide. Later runs see this and exit in seconds.
+
+    Only counts mode="submit" records. A dry run must never block the real
+    one -- otherwise running `python -m src.execution.runner` by hand in
+    the morning would silently suppress that day's actual decision, which
+    is a far worse failure than the one this guard prevents.
+    """
+    day = (on_date or datetime.now(timezone.utc).date()).isoformat()
+    for record in read_all(path):
+        if record.get("mode") != "submit":
+            continue
+        if str(record.get("logged_at", "")).startswith(day):
+            return True
+    return False
+
+
 def open_positions(path: Path = DEFAULT_LOG_PATH) -> list[dict]:
     """Submitted orders with no corresponding settlement record.
 
