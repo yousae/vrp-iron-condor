@@ -1,0 +1,9 @@
+# The trade log is append-only: every line is a self-contained, timestamped
+# JSON record. When two runs each append a different line, the default merge
+# driver sees competing edits to the same region and conflicts -- which is
+# exactly what failed run 31032029624.
+#
+# "union" keeps BOTH sides instead of conflicting. For an append-only log that
+# is not a compromise, it is the correct semantics: no record is ever lost, and
+# ordering does not matter because each line carries its own timestamp.
+logs/*.jsonl merge=union
