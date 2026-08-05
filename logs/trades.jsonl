@@ -12,3 +12,5 @@
 {"logged_at": "2026-08-05T17:09:51.573938+00:00", "kind": "signal_check", "as_of": "2026-08-05", "iv_rank": 14.33, "vix": 15.99, "skew": 126.41, "threshold": 50, "fired": false, "reason": "iv_rank 14.3 <= threshold 50"}
 {"logged_at": "2026-08-05T17:43:12.340910+00:00", "kind": "signal_check", "as_of": "2026-08-05", "iv_rank": 13.88, "vix": 15.91, "skew": 126.41, "threshold": 50, "fired": false, "reason": "iv_rank 13.9 <= threshold 50"}
 {"logged_at": "2026-08-05T17:52:55.724734+00:00", "kind": "signal_check", "as_of": "2026-08-05", "iv_rank": 13.77, "vix": 15.89, "skew": 126.41, "threshold": 50, "fired": false, "reason": "iv_rank 13.8 <= threshold 50"}
+{"logged_at": "2026-08-05T17:59:00.737758+00:00", "kind": "signal_check", "as_of": "2026-08-05", "iv_rank": 13.71, "vix": 15.88, "skew": 126.41, "threshold": 50, "fired": false, "reason": "iv_rank 13.7 <= threshold 50"}
+{"logged_at": "2026-08-05T18:26:49.752858+00:00", "kind": "signal_check", "as_of": "2026-08-05", "iv_rank": 13.03, "vix": 15.76, "skew": 126.41, "threshold": 50, "fired": false, "reason": "iv_rank 13.0 <= threshold 50"}
