@@ -76,6 +76,16 @@ backtest:
   # actual per-contract XSP fee and update. Flagged to Carter alongside the
   # slippage question -- same research trip.
   cost_per_contract_usd: 0.65
+  # UNDER REVIEW -- first live paper evidence suggests this is optimistic.
+  # 2026-08-05 plumbing tests on XSP 726/747/809/830 (Sep-18):
+  #   - crossing the spread filled at 4.35 vs a 5.42 model mid  -> ~20% cost
+  #   - a correctly-signed limit AT the model mid rested unfilled 100s+
+  # i.e. the market would not pay mid; the achievable credit was ~20% below it.
+  # NOT changed yet: n=1, one package, one moment, and in a paper environment
+  # Alpaca states does not match live fills. The gap also conflates real
+  # bid-ask with flat-VIX model error (spec 7.1) -- our "mid" may not be the
+  # market's mid. Collect more observations before moving this number.
+  # Sensitivity (post-2010, threshold>50): Sharpe 0.61 at 10%, 0.45 at 20%.
   slippage_pct_of_credit: 0.10       # haircut on net credit to proxy 4-leg bid-ask slippage
 
 # Reframed from a statistical test to an operational one, 2026-08-03.
