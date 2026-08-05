@@ -212,6 +212,25 @@ def describe_preflight(info: dict) -> str:
     return "\n".join(lines)
 
 
+def fetch_listed_strikes(client, underlying: str, expiration: date) -> list[float]:
+    """The strikes actually listed for this underlying and expiration.
+
+    Exists because assuming a uniform strike grid is wrong and gets orders
+    rejected. XSP lists roughly $1 apart near the money but widens to $5
+    and $10 further out, so a computed wing can easily land on a strike
+    that does not exist -- which is exactly how the first plumbing test
+    failed ("asset XSP260918C00831000 not found"; 831 is unlisted, 830 is).
+
+    Returns sorted unique strikes. Read the grid, do not guess it.
+    """
+    from alpaca.trading.requests import GetOptionContractsRequest
+
+    assert_paper_client(client)
+    res = client.get_option_contracts(GetOptionContractsRequest(
+        underlying_symbols=[underlying.upper()], expiration_date=expiration, limit=10000))
+    return sorted({float(c.strike_price) for c in res.option_contracts})
+
+
 def get_order(client, order_id):
     """Fetch a submitted order back, to see status and actual fill."""
     assert_paper_client(client)
@@ -221,11 +240,27 @@ def get_order(client, order_id):
 def build_condor_order(ticket: Ticket, underlying: str, expiration: date, limit_credit: float | None = None):
     """Build (but do NOT submit) the multi-leg order request.
 
-    limit_credit is the minimum acceptable net credit per spread, in
-    dollars-per-contract terms. Passing None sends a market order, which
-    is a bad idea on a 4-leg index spread -- wide books mean a market
-    order can fill far off mid, which is exactly the slippage this
-    project is trying to measure rather than incur. Prefer a limit.
+    limit_credit is the minimum acceptable net credit per spread, as a
+    POSITIVE number (5.46 means "I want at least $5.46 credit").
+
+    Alpaca signs multi-leg prices: a credit is NEGATIVE, a debit positive.
+    Verified empirically -- the first plumbing test received $4.35 credit
+    and Alpaca reported filled_avg_price = -4.35. So this negates before
+    submitting.
+
+    Getting this wrong is not a loud failure. Submitting +5.46 does not
+    error; Alpaca reads it as "willing to PAY up to $5.46", which any
+    credit trivially satisfies, so the order fills instantly at whatever
+    the book offers. The limit becomes PERMISSIVE rather than protective
+    and behaves like a market order. That is precisely what happened on
+    the first test: it filled at $4.35 against a $5.46 model, a 20.3%
+    shortfall that looked like catastrophic slippage but was really this
+    bug.
+
+    Passing None sends a market order, which is a bad idea on a 4-leg
+    index spread for the same reason -- wide books mean it can fill far
+    off mid, which is the cost this project is trying to MEASURE rather
+    than incur.
     """
     from alpaca.trading.enums import OrderClass, OrderSide, TimeInForce
     from alpaca.trading.requests import (
@@ -251,7 +286,13 @@ def build_condor_order(ticket: Ticket, underlying: str, expiration: date, limit_
     )
     if limit_credit is None:
         return MarketOrderRequest(**common)
-    return LimitOrderRequest(limit_price=round(limit_credit, 2), **common)
+    if limit_credit <= 0:
+        raise ValueError(
+            f"limit_credit must be a positive credit amount, got {limit_credit}. "
+            "The negation to Alpaca's signed convention happens here, not in the caller."
+        )
+    # Negative == credit, per Alpaca's signed multi-leg convention.
+    return LimitOrderRequest(limit_price=round(-limit_credit, 2), **common)
 
 
 PAPER_BASE_URL = "https://paper-api.alpaca.markets"

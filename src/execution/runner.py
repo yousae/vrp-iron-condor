@@ -277,6 +277,7 @@ def plumbing_test(config: dict | None = None) -> dict:
     from src.execution.alpaca_client import (
         build_condor_order,
         describe_preflight,
+        fetch_listed_strikes,
         get_client,
         get_order,
         preflight,
@@ -303,6 +304,15 @@ def plumbing_test(config: dict | None = None) -> dict:
 
     market = current_market()
     execution = config["execution"]
+    expiration = next_monthly_expiration(
+        market["as_of"], execution["target_calendar_days_to_expiry"]
+    )
+    # Read the real strike grid rather than assuming one. XSP lists ~$1
+    # apart near the money but $5/$10 further out, so a computed wing can
+    # land on a strike that does not exist.
+    strikes = fetch_listed_strikes(client, execution["symbol"], expiration)
+    print(f"\n  {len(strikes)} strikes listed for {expiration}")
+
     spot = market["spot_spx"] / 10 if execution["symbol"] == "XSP" else market["spot_spx"]
     ticket = build_ticket(
         spot=spot,
@@ -314,9 +324,7 @@ def plumbing_test(config: dict | None = None) -> dict:
         contracts=1,
         wing_width_points=execution["wing_width_points"],
         strike_increment=execution["strike_increment"],
-    )
-    expiration = next_monthly_expiration(
-        market["as_of"], execution["target_calendar_days_to_expiry"]
+        available_strikes=strikes,
     )
     limit_credit = round(ticket.modeled_credit_usd / 100, 2)
 

@@ -98,6 +98,7 @@ def build_ticket(
     strike_increment: float | None = 1.0,
     put_iv_adjustment: float = 0.0,
     call_iv_adjustment: float = 0.0,
+    available_strikes: list[float] | None = None,
 ) -> Ticket:
     """Compute the strikes and modeled credit for one condor entry.
 
@@ -151,7 +152,38 @@ def build_ticket(
         long_put = short_put - wing_width_points
         long_call = short_call + wing_width_points
 
-    if strike_increment is not None:
+    if available_strikes:
+        # Snap to strikes that ACTUALLY exist. Shorts move away from spot
+        # (less chance of being breached); wings move toward spot (narrower
+        # spread => smaller max loss). Both directions reduce risk relative
+        # to the unsnapped position, so snapping can never make the trade
+        # riskier than the model priced -- only cheaper in credit.
+        listed = sorted(available_strikes)
+
+        def _at_or_below(x):
+            below = [k for k in listed if k <= x]
+            if not below:
+                raise ValueError(f"no listed strike at or below {x}")
+            return below[-1]
+
+        def _at_or_above(x):
+            above = [k for k in listed if k >= x]
+            if not above:
+                raise ValueError(f"no listed strike at or above {x}")
+            return above[0]
+
+        short_put = _at_or_below(short_put)     # further OTM
+        long_put = _at_or_above(long_put)       # narrower wing
+        short_call = _at_or_above(short_call)   # further OTM
+        long_call = _at_or_below(long_call)     # narrower wing
+
+        if not (long_put < short_put and short_call < long_call):
+            raise ValueError(
+                f"snapping to listed strikes collapsed a spread "
+                f"(put {long_put}/{short_put}, call {short_call}/{long_call}). "
+                "Widen the wings."
+            )
+    elif strike_increment is not None:
         inc = strike_increment
         # Round every strike outward (away from spot): shorts further OTM
         # reduces assignment probability, wings further out widens the

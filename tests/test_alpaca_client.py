@@ -117,6 +117,12 @@ def test_get_client_blocks_live():
 
 
 def test_get_client_requires_credentials(monkeypatch):
+    """Clearing the env is not enough once a real .env exists on disk --
+    get_client() loads it. Stub the loader too, or this passes/fails
+    depending on whether the developer has set up credentials."""
+    import dotenv
+
+    monkeypatch.setattr(dotenv, "load_dotenv", lambda *a, **k: False)
     monkeypatch.delenv("ALPACA_API_KEY", raising=False)
     monkeypatch.delenv("ALPACA_SECRET_KEY", raising=False)
 
@@ -169,3 +175,26 @@ def test_submit_order_refuses_a_live_client_before_any_network_call():
 
     with pytest.raises(RuntimeError, match="REFUSING"):
         submit_order(ExplodingClient(), object())
+
+
+# ---- limit-price sign convention ----
+
+def test_limit_credit_is_submitted_as_a_negative_price():
+    """Alpaca signs a credit NEGATIVE. Submitting a positive number reads
+    as a debit ceiling, which any credit satisfies -- the order then fills
+    instantly at whatever the book offers instead of holding for the price.
+    That is not an error, just a silently worse fill, so it needs a test."""
+    from src.execution.alpaca_client import build_condor_order
+
+    req = build_condor_order(_ticket(), "XSP", EXPIRY, limit_credit=5.46)
+
+    assert float(req.limit_price) == -5.46
+
+
+def test_build_condor_order_rejects_a_negative_limit_credit():
+    """Callers pass the credit they want as a positive number; negating is
+    this function's job. A caller pre-negating would double-negate."""
+    from src.execution.alpaca_client import build_condor_order
+
+    with pytest.raises(ValueError, match="positive credit"):
+        build_condor_order(_ticket(), "XSP", EXPIRY, limit_credit=-5.46)
