@@ -72,12 +72,30 @@ def open_positions(path: Path = DEFAULT_LOG_PATH) -> list[dict]:
     were allowed to stack positions the backtest would no longer
     describe what ran.
     """
-    settled_ids = {r.get("order_id") for r in read_kind("settled", path)}
+    records = read_all(path)
+
+    settled_ids = {r.get("order_id") for r in records if r.get("kind") == "settled"}
+
+    # An order that never FILLED is not a position. Cancelled and rejected
+    # orders must be excluded or they block the bot permanently -- once
+    # automated, a single unfilled order would silently stop all future
+    # trading, which is exactly the kind of failure that looks like "the
+    # signal just never fired again".
+    dead_ids = {
+        r.get("order_id") for r in records
+        if r.get("kind") == "plumbing_test_result"
+        and any(s in str(r.get("order_status", "")).upper()
+                for s in ("CANCEL", "REJECT", "NOT_FILLED", "EXPIRED"))
+    }
+
     # Plumbing tests are tagged separately so they never pollute Phase 5
-    # statistics, but they open a REAL paper position, so they must still
-    # block a second concurrent trade.
-    submitted = read_kind("order_submitted", path) + read_kind("plumbing_test", path)
-    return [r for r in submitted if r.get("order_id") not in settled_ids]
+    # statistics, but a FILLED one opens a real paper position and must
+    # still block a concurrent trade.
+    submitted = [r for r in records if r.get("kind") in ("order_submitted", "plumbing_test")]
+    return [
+        r for r in submitted
+        if r.get("order_id") not in settled_ids and r.get("order_id") not in dead_ids
+    ]
 
 
 if __name__ == "__main__":

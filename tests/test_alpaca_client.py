@@ -198,3 +198,46 @@ def test_build_condor_order_rejects_a_negative_limit_credit():
 
     with pytest.raises(ValueError, match="positive credit"):
         build_condor_order(_ticket(), "XSP", EXPIRY, limit_credit=-5.46)
+
+
+# ---- price walk ----
+
+def test_price_schedule_walks_mid_down_to_floor():
+    from src.execution.alpaca_client import price_schedule
+
+    s = price_schedule(5.42, steps=5, floor_pct_of_mid=0.80)
+
+    assert s[0] == 5.42                      # starts at mid
+    assert s[-1] == pytest.approx(4.34, abs=0.01)  # ends at the floor
+    assert s == sorted(s, reverse=True)      # monotonically decreasing
+
+
+def test_price_schedule_never_goes_below_the_floor():
+    """The floor encodes the pre-registered slippage limit. Going under it
+    would accept a fill already declared disqualifying."""
+    from src.execution.alpaca_client import price_schedule
+
+    for steps in (1, 2, 5, 20):
+        s = price_schedule(10.0, steps=steps, floor_pct_of_mid=0.80)
+        assert min(s) >= 8.0 - 1e-9
+
+
+def test_price_schedule_single_step_is_the_floor():
+    from src.execution.alpaca_client import price_schedule
+
+    assert price_schedule(10.0, steps=1, floor_pct_of_mid=0.80) == [8.0]
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"steps": 0},
+    {"floor_pct_of_mid": 0},
+    {"floor_pct_of_mid": 1.5},
+    {"mid_credit": 0},
+])
+def test_price_schedule_rejects_invalid(kwargs):
+    from src.execution.alpaca_client import price_schedule
+
+    args = {"mid_credit": 5.0, "steps": 5, "floor_pct_of_mid": 0.8}
+    args.update(kwargs)
+    with pytest.raises(ValueError):
+        price_schedule(**args)

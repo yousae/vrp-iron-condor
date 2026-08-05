@@ -48,3 +48,33 @@ def test_open_positions_excludes_settled(tmp_path: Path):
     trade_log.append({"kind": "settled", "order_id": "a"}, log)
 
     assert [p["order_id"] for p in trade_log.open_positions(log)] == ["b"]
+
+
+def test_cancelled_order_is_not_an_open_position(tmp_path: Path):
+    """An unfilled order is not a position. If it counted, one cancelled
+    order would block all future trading forever once automated -- and it
+    would look exactly like the signal never firing again."""
+    log = tmp_path / "t.jsonl"
+    trade_log.append({"kind": "plumbing_test", "order_id": "a", "order_status": "OrderStatus.NEW"}, log)
+    trade_log.append({"kind": "plumbing_test_result", "order_id": "a",
+                      "order_status": "CANCELED_UNFILLED"}, log)
+
+    assert trade_log.open_positions(log) == []
+
+
+def test_filled_order_still_counts_as_open(tmp_path: Path):
+    log = tmp_path / "t.jsonl"
+    trade_log.append({"kind": "plumbing_test", "order_id": "b", "order_status": "OrderStatus.NEW"}, log)
+    trade_log.append({"kind": "plumbing_test_result", "order_id": "b",
+                      "order_status": "FILLED"}, log)
+
+    assert [p["order_id"] for p in trade_log.open_positions(log)] == ["b"]
+
+
+def test_rejected_order_is_not_an_open_position(tmp_path: Path):
+    log = tmp_path / "t.jsonl"
+    trade_log.append({"kind": "plumbing_test", "order_id": "c"}, log)
+    trade_log.append({"kind": "plumbing_test_result", "order_id": "c",
+                      "order_status": "OrderStatus.REJECTED"}, log)
+
+    assert trade_log.open_positions(log) == []

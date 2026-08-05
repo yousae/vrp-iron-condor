@@ -32,6 +32,19 @@ execution:
   strike_increment: 1.0              # XSP lists $1 strikes
   target_calendar_days_to_expiry: 30 # ~21 trading days, matches the backtest
 
+  # How the order is WORKED. A limit at the model mid rests unfilled
+  # (observed 2026-08-05), so the bot walks the price down toward the bid
+  # rather than guessing a single number or crossing the spread blindly.
+  #
+  # floor_pct_of_mid is deliberately 1 - disqualifying slippage (0.20).
+  # If the market will not do better than the threshold we already declared
+  # unacceptable, NOT trading is the correct outcome. A walk without a
+  # floor is just a slow market order.
+  order_work:
+    steps: 5                   # mid, -5%, -10%, -15%, -20%
+    seconds_per_step: 60
+    floor_pct_of_mid: 0.80
+
 exit:
   version: v1_hold_to_expiration   # switch to "v2_close_at_50pct_max_profit" once v1 is validated
 

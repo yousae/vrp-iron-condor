@@ -317,6 +317,81 @@ def assert_paper_client(client) -> None:
         raise RuntimeError("REFUSING to submit: client is not in sandbox/paper mode.")
 
 
+def price_schedule(mid_credit: float, steps: int, floor_pct_of_mid: float) -> list[float]:
+    """Limit prices to try, walking from the model mid down toward the bid.
+
+    Pure and testable -- the working loop around it is deliberately thin.
+
+    The FLOOR is the point of this. It is set from the pre-registered
+    disqualifying slippage threshold, so the bot will not accept a fill it
+    has already declared unacceptable: if the market will not do better
+    than that, not trading is the correct outcome, not a missed
+    opportunity. A price walk without a floor is just a slow market order.
+    """
+    if steps < 1:
+        raise ValueError(f"steps must be >= 1, got {steps}")
+    if not 0 < floor_pct_of_mid <= 1:
+        raise ValueError(f"floor_pct_of_mid must be in (0, 1], got {floor_pct_of_mid}")
+    if mid_credit <= 0:
+        raise ValueError(f"mid_credit must be positive, got {mid_credit}")
+
+    if steps == 1:
+        return [round(mid_credit * floor_pct_of_mid, 2)]
+    span = 1.0 - floor_pct_of_mid
+    return [round(mid_credit * (1.0 - span * i / (steps - 1)), 2) for i in range(steps)]
+
+
+def work_order(client, ticket, underlying: str, expiration: date, mid_credit: float,
+               steps: int = 5, seconds_per_step: int = 60, floor_pct_of_mid: float = 0.80,
+               on_step=None) -> dict:
+    """Walk the limit down from mid until filled, or give up at the floor.
+
+    Returns {"filled": bool, "order": order|None, "attempts": [...]}.
+    Cancels each unfilled attempt before placing the next, so at most one
+    live order exists at a time -- otherwise a fill on a stale price could
+    land while a newer, worse one is also resting.
+    """
+    import time
+
+    assert_paper_client(client)
+    attempts = []
+
+    for limit in price_schedule(mid_credit, steps, floor_pct_of_mid):
+        order = submit_order(client, build_condor_order(
+            ticket, underlying, expiration, limit_credit=limit))
+        order_id = str(order.id)
+
+        deadline = time.time() + seconds_per_step
+        status = str(getattr(order, "status", ""))
+        while time.time() < deadline:
+            time.sleep(min(5, max(1, seconds_per_step // 6)))
+            fetched = get_order(client, order_id)
+            status = str(fetched.status)
+            if status in ("OrderStatus.FILLED", "OrderStatus.REJECTED", "OrderStatus.CANCELED"):
+                break
+
+        attempts.append({"limit_credit": limit, "order_id": order_id, "status": status})
+        if on_step:
+            on_step(attempts[-1])
+
+        if status == "OrderStatus.FILLED":
+            return {"filled": True, "order": get_order(client, order_id), "attempts": attempts}
+
+        # Not filled -- cancel before stepping down. Tolerate a race where it
+        # filled between the last poll and this cancel.
+        try:
+            client.cancel_order_by_id(order_id)
+        except Exception:
+            pass
+        time.sleep(2)
+        final = get_order(client, order_id)
+        if str(final.status) == "OrderStatus.FILLED":
+            attempts[-1]["status"] = "OrderStatus.FILLED"
+            return {"filled": True, "order": final, "attempts": attempts}
+
+    return {"filled": False, "order": None, "attempts": attempts}
+
+
 def submit_order(client, order_request):
     """Submit a prepared order. The only network call in this module.
 

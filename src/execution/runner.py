@@ -219,14 +219,27 @@ def run(dry_run: bool = True, config: dict | None = None) -> dict:
     if dry_run:
         return {"submitted": False, "dry_run": True, **decision}
 
-    from src.execution.alpaca_client import build_condor_order, get_client, submit_order
+    from src.execution.alpaca_client import fetch_listed_strikes, get_client, work_order
 
     client = get_client(paper=True)
-    order_request = build_condor_order(
-        ticket, symbol, expiration,
-        limit_credit=round(ticket.modeled_credit_usd / (100 * ticket.contracts), 2),
+    strikes = fetch_listed_strikes(client, symbol, expiration)
+    ow = config["execution"]["order_work"]
+    result = work_order(
+        client, ticket, symbol, expiration,
+        round(ticket.modeled_credit_usd / (100 * ticket.contracts), 2),
+        steps=ow["steps"], seconds_per_step=ow["seconds_per_step"],
+        floor_pct_of_mid=ow["floor_pct_of_mid"],
     )
-    order = submit_order(client, order_request)
+    if not result["filled"]:
+        trade_log.append({
+            "kind": "signal_check", "as_of": market["as_of"],
+            "fired": True, "submitted": False,
+            "reason": "worked the order to the floor without a fill -- the market would not "
+                      "pay better than the pre-registered slippage threshold, so no trade",
+            "work_attempts": result["attempts"],
+        })
+        return {"submitted": False, "unfilled_at_floor": True, **decision}
+    order = result["order"]
 
     trade_log.append({
         "kind": "order_submitted",
@@ -281,7 +294,7 @@ def plumbing_test(config: dict | None = None) -> dict:
         get_client,
         get_order,
         preflight,
-        submit_order,
+        work_order,
     )
 
     config = config or load_config()
@@ -330,19 +343,24 @@ def plumbing_test(config: dict | None = None) -> dict:
 
     print()
     print(format_ticket(ticket, symbol=execution["symbol"]))
+    ow = execution["order_work"]
     print(f"\n  expiration:   {expiration}")
-    print(f"  limit price:  {limit_credit}  (interpreted as a per-spread CREDIT -- "
-          "this is the convention under test)")
-    print("\nSUBMITTING ONE PLUMBING-TEST ORDER...")
+    print(f"  working the order: {ow['steps']} steps from mid {limit_credit} "
+          f"down to {round(limit_credit*ow['floor_pct_of_mid'],2)}, "
+          f"{ow['seconds_per_step']}s each")
+    print("\nWORKING ONE PLUMBING-TEST ORDER...")
 
-    order = submit_order(client, build_condor_order(
-        ticket, execution["symbol"], expiration, limit_credit=limit_credit))
-    order_id = str(getattr(order, "id", "unknown"))
-
-    fetched = get_order(client, order_id)
-    status = str(getattr(fetched, "status", "unknown"))
-    filled_qty = getattr(fetched, "filled_qty", None)
-    filled_price = getattr(fetched, "filled_avg_price", None)
+    result = work_order(
+        client, ticket, execution["symbol"], expiration, limit_credit,
+        steps=ow["steps"], seconds_per_step=ow["seconds_per_step"],
+        floor_pct_of_mid=ow["floor_pct_of_mid"],
+        on_step=lambda a: print(f"    limit {a['limit_credit']:>6.2f} -> {a['status']}"),
+    )
+    order = result["order"]
+    order_id = str(getattr(order, "id", "none")) if order else "none"
+    status = str(getattr(order, "status", "NOT_FILLED")) if order else "NOT_FILLED_AT_FLOOR"
+    filled_qty = getattr(order, "filled_qty", None) if order else 0
+    filled_price = getattr(order, "filled_avg_price", None) if order else None
 
     record = trade_log.append({
         "kind": "plumbing_test",
@@ -357,6 +375,7 @@ def plumbing_test(config: dict | None = None) -> dict:
         "order_status": status,
         "filled_qty": str(filled_qty) if filled_qty is not None else None,
         "filled_avg_price": str(filled_price) if filled_price is not None else None,
+        "work_attempts": result["attempts"],
         "note": "signal bypassed on purpose; excluded from Phase 5 statistics",
     })
 
