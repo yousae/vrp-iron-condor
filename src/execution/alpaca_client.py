@@ -317,6 +317,42 @@ def assert_paper_client(client) -> None:
         raise RuntimeError("REFUSING to submit: client is not in sandbox/paper mode.")
 
 
+def close_all_legs(client, pause_seconds: int = 3) -> list[dict]:
+    """Flatten every open option leg, SHORTS FIRST.
+
+    Order matters and is not cosmetic. A defined-risk spread cannot be
+    unwound leg-by-leg in arbitrary order on a Level 3 account: closing a
+    long wing first leaves a NAKED short, which requires Level 4, and
+    Alpaca rejects it with "account not eligible to trade uncovered
+    option contracts" -- leaving the position half-closed and MORE risky
+    than before it was touched.
+
+    Buying back a short can never create a naked position, so shorts are
+    always safe to close first. Longs can then be closed freely.
+
+    Normally unnecessary: XSP is cash-settled and expires on its own. This
+    exists for test cleanup and for a future v2 early-exit rule.
+    """
+    import time
+
+    assert_paper_client(client)
+    positions = client.get_all_positions()
+    shorts_first = sorted(positions, key=lambda p: 0 if "SHORT" in str(p.side) else 1)
+
+    results = []
+    for pos in shorts_first:
+        entry = {"symbol": pos.symbol, "side": str(pos.side), "qty": str(pos.qty)}
+        try:
+            client.close_position(pos.symbol)
+            entry["closed"] = True
+        except Exception as exc:
+            entry["closed"] = False
+            entry["error"] = str(exc)[:200]
+        results.append(entry)
+        time.sleep(pause_seconds)
+    return results
+
+
 def price_schedule(mid_credit: float, steps: int, floor_pct_of_mid: float) -> list[float]:
     """Limit prices to try, walking from the model mid down toward the bid.
 

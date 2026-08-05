@@ -241,3 +241,38 @@ def test_price_schedule_rejects_invalid(kwargs):
     args.update(kwargs)
     with pytest.raises(ValueError):
         price_schedule(**args)
+
+
+# ---- closing order ----
+
+def test_close_all_legs_closes_shorts_before_longs():
+    """Closing a long wing first leaves a naked short, which a Level 3
+    account cannot hold -- Alpaca rejects it and the position is left
+    half-closed and riskier than before. Shorts must go first."""
+    from src.execution.alpaca_client import close_all_legs
+
+    class Pos:
+        def __init__(self, symbol, side):
+            self.symbol, self.side, self.qty = symbol, side, "1"
+
+    class FakeClient:
+        _base_url = "https://paper-api.alpaca.markets"
+        _sandbox = True
+
+        def __init__(self):
+            self.closed = []
+
+        def get_all_positions(self):
+            return [Pos("LONG_CALL", "PositionSide.LONG"),
+                    Pos("SHORT_PUT", "PositionSide.SHORT"),
+                    Pos("LONG_PUT", "PositionSide.LONG"),
+                    Pos("SHORT_CALL", "PositionSide.SHORT")]
+
+        def close_position(self, symbol):
+            self.closed.append(symbol)
+
+    client = FakeClient()
+    close_all_legs(client, pause_seconds=0)
+
+    assert client.closed[:2] == ["SHORT_PUT", "SHORT_CALL"]
+    assert set(client.closed[2:]) == {"LONG_CALL", "LONG_PUT"}
