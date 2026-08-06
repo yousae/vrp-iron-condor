@@ -110,7 +110,7 @@ VIX / SPX / T-bill (yfinance)
 | Execution | `src/execution/` | Runner, tickets, expirations, price walk, Alpaca paper |
 | Automation | `.github/workflows/` | Weekday scheduled run; tests gate every trade |
 
-**120 tests**, ~3,600 lines. The suite runs *before* the workflow is allowed to
+**127 tests**, ~3,900 lines. The suite runs *before* the workflow is allowed to
 trade, so a broken commit cannot place an order.
 
 ---
@@ -128,7 +128,7 @@ python -m src.execution.runner --check       # read-only account and connectivit
 python -m src.execution.runner               # dry run: decide and log, submit nothing
 python -m src.execution.runner --submit      # place the signal-gated order
 streamlit run app/streamlit_app.py           # dashboard
-python -m pytest tests/ -q                   # 120 tests
+python -m pytest tests/ -q                   # 127 tests
 ```
 
 **Live trading is blocked in code**, not by convention: `get_client()` hardcodes
@@ -136,10 +136,12 @@ the paper endpoint and rejects `paper=False`, and `submit_order()` independently
 re-checks the resolved base URL before every submission — including against a
 client redirected via `url_override`.
 
-Automation runs weekdays at 19:30 UTC, a single time chosen because GitHub cron
-has no DST handling and that lands inside market hours year-round. Holidays and
-early closes are handled at runtime via Alpaca's clock. Requires
-`ALPACA_API_KEY` and `ALPACA_SECRET_KEY` as repository secrets.
+Automation runs weekdays at 17:30 / 18:15 / 19:00 UTC. Only the first run to
+succeed decides; the others exit immediately. The redundancy is not extra
+trading — it is insurance against GitHub's scheduler, which fired 57–73 minutes
+late on 2026-08-05 and would have pushed a single 19:30 slot past the market
+close. Holidays and early closes are handled at runtime via Alpaca's clock.
+Requires `ALPACA_API_KEY` and `ALPACA_SECRET_KEY` as repository secrets.
 
 ---
 
