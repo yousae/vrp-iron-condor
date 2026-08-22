@@ -99,6 +99,17 @@ def backtest_edge(config: dict) -> dict:
     rate = fetch_risk_free_rate_history("2005-01-01", end)
     idx = spx.index.intersection(vix.index).intersection(rate.index)
 
+    # A truncated yfinance response yields an empty backtest and then the
+    # confusing "no wins or no losses" error. Fail on the actual cause
+    # instead: ~20 years of daily data is >4000 rows, so anything under
+    # 2000 means the fetch, not the strategy, is the problem.
+    if len(idx) < 2000:
+        raise RuntimeError(
+            f"market history looks truncated: only {len(idx)} aligned rows for 2005-present "
+            f"(spx={len(spx)}, vix={len(vix)}, rate={len(rate)}). Likely a transient data-feed "
+            "failure, not a strategy result."
+        )
+
     params = dict(config)
     params["threshold"] = config["paper_trading"]["paper_stream_threshold"]
     engine = BacktestEngine(params)
@@ -116,6 +127,19 @@ def backtest_edge(config: dict) -> dict:
         "avg_win_usd": sum(wins) / len(wins),
         "avg_loss_usd": sum(losses) / len(losses),
     }
+
+
+def signal_fires(config: dict, market: dict) -> bool:
+    """Does the entry signal clear the threshold?
+
+    Deliberately shared between run() and decide() so the rule lives in
+    exactly one place. run() uses it to bail out BEFORE the expensive,
+    network-dependent work; decide() uses it as its own first gate.
+    Duplicating the comparison would let the two drift apart, and a live
+    signal that disagrees with the backtest is the failure the whole
+    signal-fidelity check exists to detect.
+    """
+    return market["iv_rank"] > config["paper_trading"]["paper_stream_threshold"]
 
 
 def decide(config: dict, market: dict, edge: dict,
@@ -137,7 +161,7 @@ def decide(config: dict, market: dict, edge: dict,
     execution = config["execution"]
     risk = config["risk"]
 
-    if market["iv_rank"] <= threshold:
+    if not signal_fires(config, market):
         return {"trade": False, "reason": f"iv_rank {market['iv_rank']:.1f} <= threshold {threshold}"}
 
     open_now = trade_log.open_positions()
@@ -240,7 +264,39 @@ def run(dry_run: bool = True, config: dict | None = None) -> dict:
                               "reason": reason})
             return {"submitted": False, "trade": False, "reason": reason}
     market = current_market()
-    edge = backtest_edge(config)
+
+    # Cheap gate FIRST. backtest_edge() and the strike-grid fetch are slow
+    # and network-dependent, and on a day the signal does not fire their
+    # results are never used. Running them anyway is what broke the job on
+    # 2026-08-14 and 2026-08-19: a transient yfinance response produced an
+    # empty backtest, backtest_edge() raised, and the run died computing
+    # Kelly inputs for a trade it was never going to place. IV rank was
+    # ~8-13 on both days, nowhere near the threshold of 50.
+    if not signal_fires(config, market):
+        threshold = config["paper_trading"]["paper_stream_threshold"]
+        reason = f"iv_rank {market['iv_rank']:.1f} <= threshold {threshold}"
+        trade_log.append({
+            "kind": "signal_check", "mode": mode, "as_of": market["as_of"],
+            "iv_rank": round(market["iv_rank"], 2), "vix": round(market["vix"], 2),
+            "skew": round(market["skew"], 2) if market.get("skew") else None,
+            "threshold": threshold, "fired": False, "reason": reason,
+        })
+        return {"submitted": False, "trade": False, "reason": reason}
+
+    # Signal fired -- now the expensive work is actually needed. If sizing
+    # inputs cannot be computed we must NOT trade, but that is worth a
+    # clean log entry and a loud failure rather than a bare stack trace,
+    # because it means the one day that matters was missed.
+    try:
+        edge = backtest_edge(config)
+    except Exception as exc:
+        reason = f"signal fired but sizing inputs unavailable ({exc}); NOT trading"
+        trade_log.append({
+            "kind": "signal_check", "mode": mode, "as_of": market["as_of"],
+            "iv_rank": round(market["iv_rank"], 2), "fired": True,
+            "submitted": False, "reason": reason,
+        })
+        raise RuntimeError(reason) from exc
 
     # Fetch the real strike grid BEFORE deciding. Deciding on an assumed
     # grid and then trading a real one would size the position against a

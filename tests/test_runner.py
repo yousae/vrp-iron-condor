@@ -114,3 +114,61 @@ def test_decide_still_respects_the_cap_on_a_real_grid():
     cap = CONFIG["risk"]["starting_capital_usd"] * CONFIG["risk"]["max_risk_per_trade_pct"]
 
     assert d["ticket"].max_loss_usd <= cap
+
+
+# ---- ordering: cheap gate before expensive work ----
+
+def test_signal_fires_is_the_single_threshold_rule():
+    """run() and decide() must share this, or the live signal could drift
+    from the backtest -- the exact divergence signal-fidelity checks for."""
+    from src.execution.runner import signal_fires
+
+    threshold = CONFIG["paper_trading"]["paper_stream_threshold"]
+    assert signal_fires(CONFIG, {**MARKET, "iv_rank": threshold + 0.1}) is True
+    assert signal_fires(CONFIG, {**MARKET, "iv_rank": float(threshold)}) is False
+    assert signal_fires(CONFIG, {**MARKET, "iv_rank": threshold - 0.1}) is False
+
+
+def test_run_does_not_compute_edge_when_signal_is_quiet(monkeypatch, tmp_path):
+    """The 2026-08-14 and 08-19 failures: a transient data glitch made
+    backtest_edge() raise, killing a run that was never going to trade.
+    A quiet day must not touch it at all."""
+    from src.execution import runner
+
+    called = {"edge": 0}
+
+    def boom(*a, **k):
+        called["edge"] += 1
+        raise RuntimeError("post-2010 backtest has no wins or no losses")
+
+    monkeypatch.setattr(runner, "backtest_edge", boom)
+    monkeypatch.setattr(runner, "current_market", lambda *a, **k: {
+        "as_of": date(2026, 8, 19), "spot_spx": 7600.0, "vix": 15.0,
+        "risk_free_rate": 0.04, "iv_rank": 8.2, "skew": 120.0,
+    })
+    monkeypatch.setattr(runner.trade_log, "append", lambda *a, **k: {})
+
+    result = runner.run(dry_run=True, config=CONFIG)
+
+    assert called["edge"] == 0, "backtest_edge must not run on a quiet day"
+    assert result["trade"] is False
+    assert "threshold" in result["reason"]
+
+
+def test_run_still_computes_edge_when_signal_fires(monkeypatch):
+    from src.execution import runner
+
+    called = {"edge": 0}
+
+    def edge(*a, **k):
+        called["edge"] += 1
+        return EDGE
+
+    monkeypatch.setattr(runner, "backtest_edge", edge)
+    monkeypatch.setattr(runner, "current_market", lambda *a, **k: {**MARKET, "skew": 120.0})
+    monkeypatch.setattr(runner.trade_log, "append", lambda *a, **k: {})
+    monkeypatch.setattr(runner.trade_log, "open_positions", lambda *a, **k: [])
+
+    runner.run(dry_run=True, config=CONFIG)
+
+    assert called["edge"] == 1, "edge is required once the signal fires"
