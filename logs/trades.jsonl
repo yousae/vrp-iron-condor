@@ -24,3 +24,4 @@
 {"logged_at": "2026-08-18T17:57:06.052416+00:00", "kind": "signal_check", "mode": "submit", "as_of": "2026-08-18", "iv_rank": 12.74, "vix": 15.71, "skew": 142.91, "threshold": 50, "fired": false, "reason": "iv_rank 12.7 <= threshold 50"}
 {"logged_at": "2026-08-20T17:58:43.738097+00:00", "kind": "signal_check", "mode": "submit", "as_of": "2026-08-20", "iv_rank": 13.88, "vix": 15.91, "skew": 142.93, "threshold": 50, "fired": false, "reason": "iv_rank 13.9 <= threshold 50"}
 {"logged_at": "2026-08-21T17:59:06.498053+00:00", "kind": "signal_check", "mode": "submit", "as_of": "2026-08-21", "iv_rank": 10.24, "vix": 15.27, "skew": 143.23, "threshold": 50, "fired": false, "reason": "iv_rank 10.2 <= threshold 50"}
+{"logged_at": "2026-08-22T17:00:37.186330+00:00", "kind": "signal_check", "fired": false, "submitted": false, "reason": "market closed; next open 2026-08-24 09:30:00-04:00"}
