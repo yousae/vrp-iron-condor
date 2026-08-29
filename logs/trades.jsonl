@@ -33,3 +33,4 @@
 {"logged_at": "2026-08-28T01:37:40.267547+00:00", "kind": "signal_check", "fired": false, "submitted": false, "reason": "market closed; next open 2026-08-28 09:30:00-04:00"}
 {"logged_at": "2026-08-28T02:10:00.713426+00:00", "kind": "signal_check", "fired": false, "submitted": false, "reason": "market closed; next open 2026-08-28 09:30:00-04:00"}
 {"logged_at": "2026-08-28T02:23:35.884084+00:00", "kind": "signal_check", "fired": false, "submitted": false, "reason": "market closed; next open 2026-08-28 09:30:00-04:00"}
+{"logged_at": "2026-08-29T01:07:36.067437+00:00", "kind": "signal_check", "fired": false, "submitted": false, "reason": "market closed; next open 2026-08-31 09:30:00-04:00"}
