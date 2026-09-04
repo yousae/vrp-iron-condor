@@ -48,3 +48,4 @@
 {"logged_at": "2026-09-03T20:05:16.272801+00:00", "kind": "signal_check", "fired": false, "submitted": false, "reason": "market closed; next open 2026-09-04 09:30:00-04:00"}
 {"logged_at": "2026-09-03T20:59:52.553752+00:00", "kind": "signal_check", "fired": false, "submitted": false, "reason": "market closed; next open 2026-09-04 09:30:00-04:00"}
 {"logged_at": "2026-09-03T21:30:51.343785+00:00", "kind": "signal_check", "fired": false, "submitted": false, "reason": "market closed; next open 2026-09-04 09:30:00-04:00"}
+{"logged_at": "2026-09-04T19:49:28.068829+00:00", "kind": "signal_check", "mode": "submit", "as_of": "2026-09-04", "iv_rank": 4.55, "vix": 14.27, "skew": 150.63, "threshold": 50, "fired": false, "reason": "iv_rank 4.6 <= threshold 50"}
