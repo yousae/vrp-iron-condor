@@ -57,3 +57,4 @@
 {"logged_at": "2026-09-08T21:31:06.345501+00:00", "kind": "signal_check", "fired": false, "submitted": false, "reason": "market closed; next open 2026-09-09 09:30:00-04:00"}
 {"logged_at": "2026-09-09T19:59:09.100731+00:00", "kind": "signal_check", "fired": false, "submitted": false, "reason": "only 1 min to close -- not enough to work the full 5-step ladder; skipping rather than half-working it"}
 {"logged_at": "2026-09-09T20:54:28.111377+00:00", "kind": "signal_check", "fired": false, "submitted": false, "reason": "market closed; next open 2026-09-10 09:30:00-04:00"}
+{"logged_at": "2026-09-09T21:22:35.832481+00:00", "kind": "signal_check", "fired": false, "submitted": false, "reason": "market closed; next open 2026-09-10 09:30:00-04:00"}
