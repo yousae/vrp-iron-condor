@@ -218,3 +218,4 @@
 {"logged_at": "2026-11-24T03:56:58.914562+00:00", "kind": "signal_check", "fired": false, "submitted": false, "reason": "market closed; next open 2026-11-24 09:30:00-05:00"}
 {"logged_at": "2026-11-24T04:08:23.272843+00:00", "kind": "signal_check", "fired": false, "submitted": false, "reason": "market closed; next open 2026-11-24 09:30:00-05:00"}
 {"logged_at": "2026-11-25T01:32:00.202026+00:00", "kind": "signal_check", "fired": false, "submitted": false, "reason": "market closed; next open 2026-11-25 09:30:00-05:00"}
+{"logged_at": "2026-11-25T02:21:56.063369+00:00", "kind": "signal_check", "fired": false, "submitted": false, "reason": "market closed; next open 2026-11-25 09:30:00-05:00"}
